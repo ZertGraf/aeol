@@ -1,14 +1,19 @@
 package sonora
 
-import "math"
+import (
+	"math"
+
+	"sonora/dsp"
+)
 
 type AudioBuffer struct {
-	data         [][]float32
-	splitData    [][][]float32
-	numChannels  int
-	numBands     int
-	numFrames    int
-	sampleRateHz uint32
+	data            [][]float32
+	splitData       [][][]float32
+	numChannels     int
+	numBands        int
+	numFrames       int
+	sampleRateHz    uint32
+	splittingFilter *dsp.SplittingFilter
 }
 
 func NewAudioBuffer(config StreamConfig) *AudioBuffer {
@@ -36,6 +41,7 @@ func NewAudioBuffer(config StreamConfig) *AudioBuffer {
 				buf.splitData[ch][b] = make([]float32, framesPerBand)
 			}
 		}
+		buf.splittingFilter = dsp.NewSplittingFilter(channels, numBands)
 	}
 
 	return buf
@@ -121,5 +127,17 @@ func numBandsForRate(sampleRate uint32) int {
 		return 2
 	default:
 		return 3
+	}
+}
+
+func (ab *AudioBuffer) SplitIntoFrequencyBands() {
+	if ab.splittingFilter != nil && ab.splitData != nil {
+		ab.splittingFilter.Analysis(ab.data, ab.splitData)
+	}
+}
+
+func (ab *AudioBuffer) MergeFrequencyBands() {
+	if ab.splittingFilter != nil && ab.splitData != nil {
+		ab.splittingFilter.Synthesis(ab.splitData, ab.data)
 	}
 }

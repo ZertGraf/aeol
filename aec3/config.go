@@ -91,7 +91,7 @@ func DefaultConfig() EchoCanceller3Config {
 			Coarse: FilterPartConfig{
 				LengthBlocks:   13,
 				RateBlocks:     250,
-				InitialScale:   0.001,
+				InitialScale:   0.05, // Coarse filter adapts faster
 				ErrorFloorLog2: -10,
 			},
 		},

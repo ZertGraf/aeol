@@ -15,20 +15,18 @@ const (
 type SincResampler struct {
 	ioRatio     float64
 	virtualPos  float64
-	blockSize   int
-	inputBuffer []float32
+	buffer      []float32
 	kernelTable [sincBufferSize]float64
-	r1, r2      int
 	backend     simd.Backend
 }
 
 func NewSincResampler(ioRatio float64, requestFrames int) *SincResampler {
 	s := &SincResampler{
-		ioRatio:   ioRatio,
-		blockSize: requestFrames,
-		backend:   simd.Default(),
+		ioRatio: ioRatio,
+		backend: simd.Default(),
 	}
-	s.inputBuffer = make([]float32, sincKernelSize+requestFrames)
+	srcFrames := int(math.Ceil(float64(requestFrames) * ioRatio))
+	s.buffer = make([]float32, sincKernelSize, sincKernelSize+srcFrames+10)
 	s.initKernelTable()
 	return s
 }
@@ -53,17 +51,20 @@ func (s *SincResampler) initKernelTable() {
 }
 
 func (s *SincResampler) Resample(src []float32, dst []float32) int {
-	srcLen := len(src)
+	s.buffer = append(s.buffer, src...)
+
 	dstLen := len(dst)
-	srcIdx := 0
 	dstIdx := 0
+	bufLen := len(s.buffer)
 
 	for dstIdx < dstLen {
 		intPos := int(s.virtualPos)
 		frac := s.virtualPos - float64(intPos)
 
-		for intPos+sincKernelSize > srcIdx+len(s.inputBuffer) && srcIdx < srcLen {
-			srcIdx++
+		inputStart := intPos
+		inputEnd := inputStart + sincKernelSize
+		if inputEnd > bufLen {
+			break
 		}
 
 		offsetIdx := int(frac * float64(sincResamplerOffsets))
@@ -75,16 +76,7 @@ func (s *SincResampler) Resample(src []float32, dst []float32) int {
 		k2Start := (offsetIdx + 1) * sincKernelSize
 		interpFactor := frac*float64(sincResamplerOffsets) - float64(offsetIdx)
 
-		inputStart := intPos
-		if inputStart < 0 {
-			inputStart = 0
-		}
-		inputEnd := inputStart + sincKernelSize
-		if inputEnd > srcLen {
-			break
-		}
-
-		input := src[inputStart:inputEnd]
+		input := s.buffer[inputStart:inputEnd]
 		k1 := s.kernelTable[k1Start : k1Start+sincKernelSize]
 		k2 := s.kernelTable[k2Start : k2Start+sincKernelSize]
 
@@ -94,13 +86,28 @@ func (s *SincResampler) Resample(src []float32, dst []float32) int {
 		s.virtualPos += s.ioRatio
 	}
 
-	s.virtualPos -= float64(srcLen)
+	intPos := int(s.virtualPos)
+	if intPos > 0 {
+		if intPos < len(s.buffer) {
+			copy(s.buffer, s.buffer[intPos:])
+			s.buffer = s.buffer[:len(s.buffer)-intPos]
+		} else {
+			s.buffer = s.buffer[:0]
+		}
+		s.virtualPos -= float64(intPos)
+	}
+
 	return dstIdx
 }
 
 func (s *SincResampler) Reset() {
 	s.virtualPos = 0
-	clear(s.inputBuffer)
+	if len(s.buffer) >= sincKernelSize {
+		s.buffer = s.buffer[:sincKernelSize]
+	} else {
+		s.buffer = make([]float32, sincKernelSize)
+	}
+	clear(s.buffer)
 }
 
 func sinc(x float64) float64 {
@@ -117,7 +124,7 @@ func blackmanWindow(n float64, size int) float64 {
 }
 
 type PushResampler struct {
-	sinc        *SincResampler
+	sincs       []*SincResampler
 	srcRate     int
 	dstRate     int
 	numChannels int
@@ -139,7 +146,10 @@ func NewPushResampler(srcRate, dstRate, numChannels int) *PushResampler {
 
 	if srcRate != dstRate {
 		ioRatio := float64(srcRate) / float64(dstRate)
-		pr.sinc = NewSincResampler(ioRatio, dstFrames)
+		pr.sincs = make([]*SincResampler, numChannels)
+		for ch := 0; ch < numChannels; ch++ {
+			pr.sincs[ch] = NewSincResampler(ioRatio, dstFrames)
+		}
 	}
 
 	for ch := 0; ch < numChannels; ch++ {
@@ -151,15 +161,14 @@ func NewPushResampler(srcRate, dstRate, numChannels int) *PushResampler {
 }
 
 func (pr *PushResampler) Resample(src [][]float32, dst [][]float32) {
-	if pr.sinc == nil {
+	if pr.sincs == nil {
 		for ch := 0; ch < pr.numChannels; ch++ {
 			copy(dst[ch], src[ch])
 		}
 		return
 	}
 	for ch := 0; ch < pr.numChannels; ch++ {
-		pr.sinc.Reset()
-		pr.sinc.Resample(src[ch], dst[ch])
+		pr.sincs[ch].Resample(src[ch], dst[ch])
 	}
 }
 

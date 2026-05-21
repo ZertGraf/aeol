@@ -12,18 +12,17 @@ type EchoCanceller3 struct {
 
 	fftProcessor  *fft.OouraFFT
 	renderBuffer  *RenderBuffer
-	refinedFilter *AdaptiveFilter
-	coarseFilter  *AdaptiveFilter
+	subtractor    *Subtractor
+	suppressor    *SuppressionFilter
 	delayEst      *DelayEstimator
 
 	captureBlock  *Block
 	renderBlock   *Block
 	outputBlock   *Block
 
-	captureFft    FftData
-	renderFft     FftData
-	refinedOutput FftData
-	errorFft      FftData
+	captureFft       FftData
+	renderFft        FftData
+	subtractorOutput SubtractorOutput
 
 	fftBuf [FFTSize]float32
 	delay  int
@@ -40,8 +39,8 @@ func NewEchoCanceller3(config EchoCanceller3Config, sampleRate uint32, numChanne
 		numBands:      numBands,
 		fftProcessor:  fft.NewOouraFFT(),
 		renderBuffer:  NewRenderBuffer(config.Filter.Refined.LengthBlocks + config.Delay.DelayHeadroomBlocks + 5),
-		refinedFilter: NewAdaptiveFilter(config.Filter.Refined.LengthBlocks),
-		coarseFilter:  NewAdaptiveFilter(config.Filter.Coarse.LengthBlocks),
+		subtractor:    NewSubtractor(config.Filter),
+		suppressor:    NewSuppressionFilter(config.Suppressor),
 		delayEst:      NewDelayEstimator(config.Delay),
 		captureBlock:  NewBlock(numBands, 1),
 		renderBlock:   NewBlock(numBands, 1),
@@ -76,20 +75,14 @@ func (ec *EchoCanceller3) ProcessCapture(captureFrame []float32) {
 	clear(ec.fftBuf[BlockSize:])
 	ec.fftProcessor.ForwardSplit(ec.fftBuf[:], ec.captureFft.Re[:], ec.captureFft.Im[:])
 
-	ec.refinedFilter.Filter(ec.renderBuffer, &ec.refinedOutput)
-
-	for k := 0; k < FFTSizeBy2Plus1; k++ {
-		ec.errorFft.Re[k] = ec.captureFft.Re[k] - ec.refinedOutput.Re[k]
-		ec.errorFft.Im[k] = ec.captureFft.Im[k] - ec.refinedOutput.Im[k]
-	}
+	renderPower := renderSpectrumPower(ec.renderBuffer, ec.config.Filter.Refined.LengthBlocks)
+	ec.subtractor.Process(ec.renderBuffer, &ec.captureFft, renderPower, &ec.subtractorOutput)
 
 	ec.updateErle()
+	
+	ec.suppressor.Process(&ec.captureFft, &ec.subtractorOutput.LinearOutput, ec.erle)
 
-	renderPower := renderSpectrumPower(ec.renderBuffer, ec.config.Filter.Refined.LengthBlocks)
-	stepSize := computeStepSize(renderPower, ec.config.Filter.Refined.InitialScale)
-	ec.refinedFilter.Adapt(ec.renderBuffer, &ec.errorFft, stepSize)
-
-	ec.fftProcessor.InverseSplit(ec.errorFft.Re[:], ec.errorFft.Im[:], ec.fftBuf[:])
+	ec.fftProcessor.InverseSplit(ec.subtractorOutput.LinearOutput.Re[:], ec.subtractorOutput.LinearOutput.Im[:], ec.fftBuf[:])
 	copy(captureFrame[:BlockSize], ec.fftBuf[:BlockSize])
 }
 
@@ -97,7 +90,7 @@ func (ec *EchoCanceller3) updateErle() {
 	var capturePower, errorPower float32
 	for k := 0; k < FFTSizeBy2Plus1; k++ {
 		capturePower += ec.captureFft.Re[k]*ec.captureFft.Re[k] + ec.captureFft.Im[k]*ec.captureFft.Im[k]
-		errorPower += ec.errorFft.Re[k]*ec.errorFft.Re[k] + ec.errorFft.Im[k]*ec.errorFft.Im[k]
+		errorPower += ec.subtractorOutput.LinearOutput.Re[k]*ec.subtractorOutput.LinearOutput.Re[k] + ec.subtractorOutput.LinearOutput.Im[k]*ec.subtractorOutput.LinearOutput.Im[k]
 	}
 
 	if errorPower > 1e-10 {
@@ -121,8 +114,7 @@ func (ec *EchoCanceller3) Delay() int {
 }
 
 func (ec *EchoCanceller3) Reset() {
-	ec.refinedFilter.Reset()
-	ec.coarseFilter.Reset()
+	ec.subtractor.Reset()
 	ec.renderBuffer.Reset()
 	ec.delayEst.Reset()
 	ec.captureBlock.Clear()
@@ -130,8 +122,14 @@ func (ec *EchoCanceller3) Reset() {
 	ec.outputBlock.Clear()
 	ec.captureFft.Clear()
 	ec.renderFft.Clear()
-	ec.refinedOutput.Clear()
-	ec.errorFft.Clear()
+	for k := 0; k < FFTSizeBy2Plus1; k++ {
+		ec.subtractorOutput.RefinedError.Re[k] = 0
+		ec.subtractorOutput.RefinedError.Im[k] = 0
+		ec.subtractorOutput.CoarseError.Re[k] = 0
+		ec.subtractorOutput.CoarseError.Im[k] = 0
+		ec.subtractorOutput.LinearOutput.Re[k] = 0
+		ec.subtractorOutput.LinearOutput.Im[k] = 0
+	}
 	ec.erle = 1.0
 }
 
