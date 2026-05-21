@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(where.exe go 2>$null; echo \"---GOROOT: $env:GOROOT\"; echo \"---GOPATH: $env:GOPATH\"; $env:PATH -split \";\" | Where-Object { $_ -match \"go\" })"
+    ]
+  }
+}
