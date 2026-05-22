@@ -1,15 +1,15 @@
 package aec3
 
 type Subtractor struct {
-	RefinedFilter *AdaptiveFilter
-	CoarseFilter  *AdaptiveFilter
+	refinedFilter *AdaptiveFilter
+	coarseFilter  *AdaptiveFilter
 	config        FilterConfig
 }
 
 func NewSubtractor(config FilterConfig) *Subtractor {
 	return &Subtractor{
-		RefinedFilter: NewAdaptiveFilter(config.Refined.LengthBlocks),
-		CoarseFilter:  NewAdaptiveFilter(config.Coarse.LengthBlocks),
+		refinedFilter: NewAdaptiveFilter(config.Refined.LengthBlocks),
+		coarseFilter:  NewAdaptiveFilter(config.Coarse.LengthBlocks),
 		config:        config,
 	}
 }
@@ -25,8 +25,8 @@ func (s *Subtractor) Process(renderBuffer *RenderBuffer, captureFft *FftData, re
 	var refinedOutput FftData
 	var coarseOutput FftData
 
-	s.RefinedFilter.Filter(renderBuffer, &refinedOutput)
-	s.CoarseFilter.Filter(renderBuffer, &coarseOutput)
+	s.refinedFilter.Filter(renderBuffer, &refinedOutput)
+	s.coarseFilter.Filter(renderBuffer, &coarseOutput)
 
 	var refinedErrorPower, coarseErrorPower float32
 
@@ -57,13 +57,13 @@ func (s *Subtractor) Process(renderBuffer *RenderBuffer, captureFft *FftData, re
 
 	// Adapt filters
 	refinedStep := computeStepSize(renderPower, s.config.Refined.InitialScale)
-	s.RefinedFilter.Adapt(renderBuffer, &output.RefinedError, refinedStep)
+	s.refinedFilter.Adapt(renderBuffer, &output.RefinedError, refinedStep)
 
 	coarseStep := computeStepSize(renderPower, s.config.Coarse.InitialScale)
-	s.CoarseFilter.Adapt(renderBuffer, &output.CoarseError, coarseStep)
+	s.coarseFilter.Adapt(renderBuffer, &output.CoarseError, coarseStep)
 }
 
 func (s *Subtractor) Reset() {
-	s.RefinedFilter.Reset()
-	s.CoarseFilter.Reset()
+	s.refinedFilter.Reset()
+	s.coarseFilter.Reset()
 }

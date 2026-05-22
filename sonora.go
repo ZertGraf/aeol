@@ -195,14 +195,15 @@ func (ap *AudioProcessing) processCaptureFloatLocked(data [][]float32) error {
 
 	ap.updateStats(data)
 	return nil
-	}
-	func (ap *AudioProcessing) ProcessRenderFloat(data [][]float32) error {
+}
+
+func (ap *AudioProcessing) ProcessRenderFloat(data [][]float32) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
 	return ap.processRenderFloatLocked(data)
-	}
+}
 
-	func (ap *AudioProcessing) processRenderFloatLocked(data [][]float32) error {
+func (ap *AudioProcessing) processRenderFloatLocked(data [][]float32) error {
 	if len(data) == 0 || len(data[0]) == 0 {
 		return nil
 	}
@@ -228,7 +229,8 @@ func (ap *AudioProcessing) processCaptureFloatLocked(data [][]float32) error {
 	}
 
 	return nil
-	}
+}
+
 func (ap *AudioProcessing) ProcessCaptureInt16(interleaved []int16) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()

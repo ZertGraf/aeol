@@ -73,21 +73,8 @@ func synthesisQMF(lowBand []float32, highBand []float32, outData []float32, filt
 	allpassQMF(halfIn2[:], filter2[:], allPassFilter1[:], filterState2)
 
 	for i := 0; i < SamplesPerBand; i++ {
-		s1 := filter2[i]
-		if s1 < -32768.0 {
-			s1 = -32768.0
-		} else if s1 > 32767.0 {
-			s1 = 32767.0
-		}
-		outData[2*i] = s1
-
-		s2 := filter1[i]
-		if s2 < -32768.0 {
-			s2 = -32768.0
-		} else if s2 > 32767.0 {
-			s2 = 32767.0
-		}
-		outData[2*i+1] = s2
+		outData[2*i] = filter2[i]
+		outData[2*i+1] = filter1[i]
 	}
 }
 

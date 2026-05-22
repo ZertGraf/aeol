@@ -122,14 +122,9 @@ func (ec *EchoCanceller3) Reset() {
 	ec.outputBlock.Clear()
 	ec.captureFft.Clear()
 	ec.renderFft.Clear()
-	for k := 0; k < FFTSizeBy2Plus1; k++ {
-		ec.subtractorOutput.RefinedError.Re[k] = 0
-		ec.subtractorOutput.RefinedError.Im[k] = 0
-		ec.subtractorOutput.CoarseError.Re[k] = 0
-		ec.subtractorOutput.CoarseError.Im[k] = 0
-		ec.subtractorOutput.LinearOutput.Re[k] = 0
-		ec.subtractorOutput.LinearOutput.Im[k] = 0
-	}
+	ec.subtractorOutput.RefinedError.Clear()
+	ec.subtractorOutput.CoarseError.Clear()
+	ec.subtractorOutput.LinearOutput.Clear()
 	ec.erle = 1.0
 }
 
