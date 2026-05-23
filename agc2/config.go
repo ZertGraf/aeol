@@ -61,5 +61,5 @@ func linearToDb(linear float32) float32 {
 	if linear <= 0 {
 		return -100
 	}
-	return float32(20.0 * math.Log10(float64(linear)))
+	return float32(20.0 * math.Log10(float64(linear) / 32768.0))
 }

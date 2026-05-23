@@ -27,6 +27,10 @@ type AudioProcessing struct {
 
 	streamDelayMs int
 	stats         AudioProcessingStats
+
+	statsDbfs  float64
+	statsErle  float64
+	statsDelay int
 }
 
 func newAudioProcessing(captureConfig, renderConfig StreamConfig, config Config) (*AudioProcessing, error) {
@@ -340,20 +344,20 @@ func (ap *AudioProcessing) updateStats(data [][]float32) {
 	if len(data) == 0 || len(data[0]) == 0 {
 		return
 	}
-	
+
 	samples := data[0]
 	var sum float64
 	for _, s := range samples {
 		sum += float64(s) * float64(s)
 	}
 	rms := math.Sqrt(sum / float64(len(samples)))
-	dbfs := 20 * math.Log10(rms+1e-10)
-	ap.stats.OutputRmsDbfs = &dbfs
+	ap.statsDbfs = 20 * math.Log10(rms + 1e-10)
+	ap.stats.OutputRmsDbfs = &ap.statsDbfs
 
 	if len(ap.echoCancellers) > 0 && ap.echoCancellers[0] != nil {
-		erle := float64(ap.echoCancellers[0].ERLE())
-		ap.stats.EchoReturnLossEnhancement = &erle
-		delay := ap.echoCancellers[0].Delay()
-		ap.stats.DelayMs = &delay
+		ap.statsErle = float64(ap.echoCancellers[0].ERLE())
+		ap.stats.EchoReturnLossEnhancement = &ap.statsErle
+		ap.statsDelay = ap.echoCancellers[0].Delay()
+		ap.stats.DelayMs = &ap.statsDelay
 	}
 }

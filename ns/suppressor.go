@@ -18,11 +18,14 @@ type Suppressor struct {
 	analysisBuffer [fftSize]float32
 	synthBuffer    [fftSize]float32
 	overlapBuf     [overlapSize]float32
+	synthOverlap   [overlapSize]float32
 	upperBandDelayBuf [2][overlapSize]float32
 	window         [fftSize]float32
 
 	re [numFreqBins]float32
 	im [numFreqBins]float32
+
+	fftBuf [fftSize]float32
 
 	speechProb  [numFreqBins]float32
 	signalSpec  [numFreqBins]float32
@@ -43,9 +46,14 @@ func NewSuppressor(cfg Config) *Suppressor {
 }
 
 func (s *Suppressor) initWindow() {
-	for i := 0; i < fftSize; i++ {
-		t := float32(i) / float32(fftSize)
-		s.window[i] = 0.5 - 0.5*cosf(2*pi*t)
+	for i := 0; i < overlapSize; i++ {
+		s.window[i] = float32(math.Sin(math.Pi * float64(i) / float64(2*overlapSize)))
+	}
+	for i := overlapSize; i <= frameLength; i++ {
+		s.window[i] = 1.0
+	}
+	for i := 0; i < fftSize-frameLength-1; i++ {
+		s.window[frameLength+1+i] = s.window[overlapSize-1-i]
 	}
 }
 
@@ -62,25 +70,20 @@ func (s *Suppressor) Process(frame []float32) {
 		s.analysisBuffer[i] *= s.window[i]
 	}
 
-	fftData := make([]float32, fftSize)
-	copy(fftData, s.analysisBuffer[:])
-	s.fftProcessor.Forward(fftData)
+	copy(s.fftBuf[:], s.analysisBuffer[:])
+	s.fftProcessor.Forward(s.fftBuf[:])
 
-	s.re[0] = fftData[0]
+	s.re[0] = s.fftBuf[0]
 	s.im[0] = 0
-	s.re[numFreqBins-1] = fftData[1]
+	s.re[numFreqBins-1] = s.fftBuf[1]
 	s.im[numFreqBins-1] = 0
 	for i := 1; i < numFreqBins-1; i++ {
-		s.re[i] = fftData[2*i]
-		s.im[i] = fftData[2*i+1]
+		s.re[i] = s.fftBuf[2*i]
+		s.im[i] = s.fftBuf[2*i+1]
 	}
 
 	for i := 0; i < numFreqBins; i++ {
-		power := s.re[i]*s.re[i] + s.im[i]*s.im[i]
-		if power < 1e-10 {
-			power = 1e-10
-		}
-		s.signalSpec[i] = fastLog(power)
+		s.signalSpec[i] = fastLog(s.re[i]*s.re[i] + s.im[i]*s.im[i])
 	}
 
 	s.noiseEst.Update(s.signalSpec)
@@ -92,30 +95,29 @@ func (s *Suppressor) Process(frame []float32) {
 	s.wiener.Update(s.signalSpec, noiseSpec, s.speechProb, s.params)
 	s.wiener.Apply(s.re[:], s.im[:])
 
-	fftData[0] = s.re[0]
-	fftData[1] = s.re[numFreqBins-1]
+	s.fftBuf[0] = s.re[0]
+	s.fftBuf[1] = s.re[numFreqBins-1]
 	for i := 1; i < numFreqBins-1; i++ {
-		fftData[2*i] = s.re[i]
-		fftData[2*i+1] = s.im[i]
+		s.fftBuf[2*i] = s.re[i]
+		s.fftBuf[2*i+1] = s.im[i]
 	}
 
-	s.fftProcessor.Inverse(fftData)
+	s.fftProcessor.Inverse(s.fftBuf[:])
 
 	for i := 0; i < fftSize; i++ {
-		s.synthBuffer[i] = fftData[i] * s.window[i]
+		s.synthBuffer[i] = s.fftBuf[i] * s.window[i]
 	}
 
-	for i := 0; i < frameLength; i++ {
-		if i < overlapSize {
-			frame[i] = s.synthBuffer[i]
-		} else {
-			frame[i] = s.synthBuffer[i]
-		}
+	for i := 0; i < overlapSize; i++ {
+		frame[i] = s.synthOverlap[i] + s.synthBuffer[i]
 	}
+	copy(frame[overlapSize:frameLength], s.synthBuffer[overlapSize:frameLength])
+	copy(s.synthOverlap[:], s.synthBuffer[frameLength:fftSize])
 }
 
 func (s *Suppressor) Reset() {
 	clear(s.overlapBuf[:])
+	clear(s.synthOverlap[:])
 	clear(s.analysisBuffer[:])
 	clear(s.synthBuffer[:])
 	clear(s.upperBandDelayBuf[0][:])

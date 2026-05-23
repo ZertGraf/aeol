@@ -31,8 +31,9 @@ type DelayConfig struct {
 }
 
 type FilterConfig struct {
-	Refined FilterPartConfig
-	Coarse  FilterPartConfig
+	Refined                   FilterPartConfig
+	Coarse                    FilterPartConfig
+	CoarseResetHangoverBlocks int
 }
 
 type FilterPartConfig struct {
@@ -91,13 +92,14 @@ func DefaultConfig() EchoCanceller3Config {
 			Coarse: FilterPartConfig{
 				LengthBlocks:   13,
 				RateBlocks:     250,
-				InitialScale:   0.05, // Coarse filter adapts faster
+				InitialScale:   0.05,
 				ErrorFloorLog2: -10,
 			},
+			CoarseResetHangoverBlocks: 25,
 		},
 		Erle: ErleConfig{
 			Min:       1.0,
-			MaxLf:     8.0,
+			MaxLf:     4.0,
 			MaxHf:     1.5,
 			OnsetRate: 0.1,
 		},
@@ -107,10 +109,10 @@ func DefaultConfig() EchoCanceller3Config {
 		},
 		Suppressor: SuppressorConfig{
 			NormalTuning: SuppressionTuning{
-				MaskLf:       MaskConfig{EnrTransparent: 0.3, EnrSuppress: 0.8, EmrTransparent: 0.4},
+				MaskLf:       MaskConfig{EnrTransparent: 0.3, EnrSuppress: 0.4, EmrTransparent: 0.4},
 				MaskHf:       MaskConfig{EnrTransparent: 0.07, EnrSuppress: 0.1, EmrTransparent: 0.3},
 				MaxIncFactor: 2.0,
-				MaxDecFactor: 0.5,
+				MaxDecFactor: 0.25,
 			},
 			NearendTuning: SuppressionTuning{
 				MaskLf:       MaskConfig{EnrTransparent: 1.09, EnrSuppress: 1.1, EmrTransparent: 0.3},

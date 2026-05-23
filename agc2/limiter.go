@@ -64,10 +64,10 @@ func (l *limiter) Process(samples []float32) {
 	gainLinear := dbToLinear(gainDb)
 	for i := range samples {
 		samples[i] *= gainLinear
-		if samples[i] > 1.0 {
-			samples[i] = 1.0
-		} else if samples[i] < -1.0 {
-			samples[i] = -1.0
+		if samples[i] > 32767.0 {
+			samples[i] = 32767.0
+		} else if samples[i] < -32768.0 {
+			samples[i] = -32768.0
 		}
 	}
 }

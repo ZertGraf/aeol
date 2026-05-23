@@ -1,67 +1,71 @@
 package aec3
 
+import (
+	"sonora/fft"
+)
+
 type SuppressionFilter struct {
-	config SuppressorConfig
+	fftProcessor     *fft.OouraFFT
+	eOutputOld       [FFTLengthBy2]float32
+	scratchNoiseGain [FFTSizeBy2Plus1]float32
+	scratchEFreq     FftData
+	scratchBuf       [FFTSize]float32
 }
 
-func NewSuppressionFilter(config SuppressorConfig) *SuppressionFilter {
+func NewSuppressionFilter() *SuppressionFilter {
 	return &SuppressionFilter{
-		config: config,
+		fftProcessor: fft.NewOouraFFT(),
 	}
 }
 
-// Process applies spectral suppression to the linear output.
-func (sf *SuppressionFilter) Process(captureFft *FftData, linearOutput *FftData, erle float32) {
-	var capturePower [FFTSizeBy2Plus1]float32
-	var errorPower [FFTSizeBy2Plus1]float32
+func (sf *SuppressionFilter) ApplyGain(
+	comfortNoise *FftData,
+	suppressionGain [FFTSizeBy2Plus1]float32,
+	eFft *FftData,
+	output []float32,
+) {
+	noiseGain := sf.scratchNoiseGain[:]
+	for k := 0; k < FFTSizeBy2Plus1; k++ {
+		sg := suppressionGain[k]
+		v := 1.0 - sg*sg
+		if v < 0 {
+			v = 0
+		}
+		noiseGain[k] = v
+	}
+	elementwiseSqrt(noiseGain)
+
+	sf.scratchEFreq.CopyFrom(eFft)
 
 	for k := 0; k < FFTSizeBy2Plus1; k++ {
-		capturePower[k] = captureFft.Re[k]*captureFft.Re[k] + captureFft.Im[k]*captureFft.Im[k]
-		errorPower[k] = linearOutput.Re[k]*linearOutput.Re[k] + linearOutput.Im[k]*linearOutput.Im[k]
-	}
+		eReal := sf.scratchEFreq.Re[k] * suppressionGain[k]
+		eImag := sf.scratchEFreq.Im[k] * suppressionGain[k]
 
-	for k := 0; k < FFTSizeBy2Plus1; k++ {
-		// Basic spectral suppression gain calculation based on residual echo power vs capture power
-		
-		// The estimated echo power is capture power minus error power (as error = capture - echo).
-		// In reality, if errorPower is much smaller than capturePower, echo power was high.
-		// If echo was removed perfectly, linearOutput only has near-end signal.
-		// Here we compute a simple Wiener filter-like gain based on ERLE.
-		
-		var gain float32 = 1.0
-		
-		if capturePower[k] > 1e-10 {
-			// A simple heuristic: residual echo power is estimated echo power / ERLE.
-			// estimated echo power is roughly capturePower - errorPower, bounded by 0.
-			estEchoPower := capturePower[k] - errorPower[k]
-			if estEchoPower < 0 {
-				estEchoPower = 0
-			}
-			
-			// residual echo power
-			residualEchoPower := estEchoPower / erle
-			
-			// Suppress based on signal-to-residual-echo ratio
-			if residualEchoPower > 1e-10 {
-				snr := errorPower[k] / residualEchoPower
-				// standard Wiener-like suppression: gain = SNR / (SNR + 1)
-				gain = snr / (snr + 1.0)
-			}
+		if comfortNoise != nil {
+			eReal += noiseGain[k] * comfortNoise.Re[k]
+			eImag += noiseGain[k] * comfortNoise.Im[k]
 		}
 
-		// Apply lower bounds based on mask config to avoid over-suppression artifacts
-		// For simplicity, just use EnrTransparent as a baseline floor
-		floor := sf.config.NormalTuning.MaskLf.EnrTransparent
-		if k > 32 { // High frequency
-			floor = sf.config.NormalTuning.MaskHf.EnrTransparent
-		}
-		
-		if gain < floor {
-			gain = floor
-		}
-		
-		// Apply suppression gain
-		linearOutput.Re[k] *= gain
-		linearOutput.Im[k] *= gain
+		sf.scratchEFreq.Re[k] = eReal
+		sf.scratchEFreq.Im[k] = eImag
 	}
+
+	sf.fftProcessor.InverseSplit(sf.scratchEFreq.Re[:], sf.scratchEFreq.Im[:], sf.scratchBuf[:])
+
+	for i := 0; i < FFTLengthBy2; i++ {
+		v := sf.eOutputOld[i]*sqrtHanning[FFTLengthBy2+i] +
+			sf.scratchBuf[i]*sqrtHanning[i]
+		if v > 32767 {
+			v = 32767
+		} else if v < -32768 {
+			v = -32768
+		}
+		output[i] = v
+	}
+
+	copy(sf.eOutputOld[:], sf.scratchBuf[FFTLengthBy2:])
+}
+
+func (sf *SuppressionFilter) Reset() {
+	clear(sf.eOutputOld[:])
 }

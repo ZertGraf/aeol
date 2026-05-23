@@ -74,7 +74,7 @@ func (ab *AudioBuffer) CopyFromInterleaved(src []int16) {
 	frameSize := int(ab.sampleRateHz) / 100
 	for ch := 0; ch < ab.numChannels; ch++ {
 		for i := 0; i < frameSize; i++ {
-			ab.data[ch][i] = float32(src[i*ab.numChannels+ch]) / math.MaxInt16
+			ab.data[ch][i] = float32(src[i*ab.numChannels+ch])
 		}
 	}
 }
@@ -83,11 +83,11 @@ func (ab *AudioBuffer) CopyToInterleaved(dst []int16) {
 	frameSize := int(ab.sampleRateHz) / 100
 	for ch := 0; ch < ab.numChannels; ch++ {
 		for i := 0; i < frameSize; i++ {
-			s := ab.data[ch][i] * math.MaxInt16
-			if s > math.MaxInt16 {
-				s = math.MaxInt16
-			} else if s < math.MinInt16 {
-				s = math.MinInt16
+			s := float32(math.Round(float64(ab.data[ch][i])))
+			if s > 32767 {
+				s = 32767
+			} else if s < -32768 {
+				s = -32768
 			}
 			dst[i*ab.numChannels+ch] = int16(s)
 		}
