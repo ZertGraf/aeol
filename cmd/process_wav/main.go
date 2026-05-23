@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"sonora"
 )
@@ -266,7 +265,5 @@ func writeWav(path string, hdr wavHeader, samples []int16) error {
 	}
 	f.Write(buf)
 
-	ext := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	_ = ext
 	return nil
 }

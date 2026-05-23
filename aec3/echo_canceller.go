@@ -72,8 +72,8 @@ func (ec *EchoCanceller3) ProcessRender(renderFrame []float32) {
 		return
 	}
 
-	copy(ec.fftBuf[:BlockSize], renderFrame[:BlockSize])
-	clear(ec.fftBuf[BlockSize:])
+	clear(ec.fftBuf[:FFTLengthBy2])
+	copy(ec.fftBuf[FFTLengthBy2:], renderFrame[:BlockSize])
 	ec.fftProcessor.ForwardSplit(ec.fftBuf[:], ec.renderFft.Re[:], ec.renderFft.Im[:])
 	ec.renderBuffer.Insert(&ec.renderFft)
 
@@ -89,8 +89,8 @@ func (ec *EchoCanceller3) ProcessCapture(captureFrame []float32) {
 
 	ec.delay = ec.delayEst.Update(ec.renderBlock.View(0, 0), captureFrame[:BlockSize])
 
-	copy(ec.fftBuf[:BlockSize], captureFrame[:BlockSize])
-	clear(ec.fftBuf[BlockSize:])
+	clear(ec.fftBuf[:FFTLengthBy2])
+	copy(ec.fftBuf[FFTLengthBy2:], captureFrame[:BlockSize])
 	ec.fftProcessor.ForwardSplit(ec.fftBuf[:], ec.captureFft.Re[:], ec.captureFft.Im[:])
 
 	renderPower := renderSpectrumPower(ec.renderBuffer, ec.config.Filter.Refined.LengthBlocks)

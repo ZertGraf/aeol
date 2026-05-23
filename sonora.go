@@ -98,7 +98,22 @@ func newAudioProcessing(captureConfig, renderConfig StreamConfig, config Config)
 func (ap *AudioProcessing) ProcessCaptureFloat(data [][]float32) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
-	return ap.processCaptureFloatLocked(data)
+
+	for ch := range data {
+		for i := range data[ch] {
+			data[ch][i] *= 32768.0
+		}
+	}
+
+	err := ap.processCaptureFloatLocked(data)
+
+	for ch := range data {
+		for i := range data[ch] {
+			data[ch][i] /= 32768.0
+		}
+	}
+
+	return err
 }
 
 func (ap *AudioProcessing) processCaptureFloatLocked(data [][]float32) error {
@@ -204,7 +219,22 @@ func (ap *AudioProcessing) processCaptureFloatLocked(data [][]float32) error {
 func (ap *AudioProcessing) ProcessRenderFloat(data [][]float32) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
-	return ap.processRenderFloatLocked(data)
+
+	for ch := range data {
+		for i := range data[ch] {
+			data[ch][i] *= 32768.0
+		}
+	}
+
+	err := ap.processRenderFloatLocked(data)
+
+	for ch := range data {
+		for i := range data[ch] {
+			data[ch][i] /= 32768.0
+		}
+	}
+
+	return err
 }
 
 func (ap *AudioProcessing) processRenderFloatLocked(data [][]float32) error {
@@ -351,7 +381,7 @@ func (ap *AudioProcessing) updateStats(data [][]float32) {
 		sum += float64(s) * float64(s)
 	}
 	rms := math.Sqrt(sum / float64(len(samples)))
-	ap.statsDbfs = 20 * math.Log10(rms + 1e-10)
+	ap.statsDbfs = 20 * math.Log10(rms/32768.0 + 1e-10)
 	ap.stats.OutputRmsDbfs = &ap.statsDbfs
 
 	if len(ap.echoCancellers) > 0 && ap.echoCancellers[0] != nil {

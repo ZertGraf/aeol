@@ -80,7 +80,7 @@ Methodology difference: Rust `process_stream` measures capture-only; Go `Benchma
 
 ### Known performance gaps
 
-1. **AEC3 adaptive filter** — 27 allocs/frame in hot path; SIMD backend may be falling back to scalar
+1. **AEC3 adaptive filter** — scalar inner loop; SIMD dispatch was removed, re-adding a SIMD-backed filter is the next optimization target
 2. **FFT** — pure Go Ooura vs Rust PFFFT (AVX2-optimized); 446ns vs ~2-3µs per 128-point transform
 3. **NS** — same FFT bottleneck on 512-point transforms
 

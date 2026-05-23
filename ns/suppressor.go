@@ -124,12 +124,6 @@ func (s *Suppressor) Reset() {
 	clear(s.upperBandDelayBuf[1][:])
 }
 
-const pi = math.Pi
-
-func cosf(x float32) float32 {
-	return float32(math.Cos(float64(x)))
-}
-
 func (s *Suppressor) ProcessUpperBand(frame []float32, band int) {
 	if len(frame) < frameLength {
 		return
