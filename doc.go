@@ -1,4 +1,4 @@
-// Package sonora provides real-time audio processing algorithms
+// Package aeol provides real-time audio processing algorithms
 // ported from the WebRTC native codebase (M145).
 //
 // Core capabilities:
@@ -10,11 +10,11 @@
 //
 // Basic usage:
 //
-//	ap, err := sonora.NewBuilder().
+//	ap, err := aeol.NewBuilder().
 //		SampleRate(48000).
 //		Channels(1).
-//		EnableEchoCanceller(sonora.DefaultEchoCancellerConfig()).
-//		EnableNoiseSuppression(sonora.DefaultNsConfig()).
+//		EnableEchoCanceller(aeol.DefaultEchoCancellerConfig()).
+//		EnableNoiseSuppression(aeol.DefaultNsConfig()).
 //		Build()
 //	if err != nil {
 //		log.Fatal(err)
@@ -34,4 +34,4 @@
 //	ap.ProcessCaptureFloatS16([][]float32{captureFrame})
 //
 // Instances are not safe for concurrent use; synchronization is the caller's responsibility.
-package sonora
+package aeol

@@ -3,7 +3,7 @@ package dsp
 import (
 	"math"
 
-	"sonora/simd"
+	"aeol/simd"
 )
 
 const (

@@ -1,9 +1,9 @@
-package sonora
+package aeol
 
-import "sonora/hpf"
+import "aeol/hpf"
 
 // HighPassFilter wraps one hpf.Filter per channel.
-// Kept for use by benchmark tests that operate at the sonora package level.
+// Kept for use by benchmark tests that operate at the aeol package level.
 type HighPassFilter struct {
 	filters []*hpf.Filter
 }

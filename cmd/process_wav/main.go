@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"sonora"
+	"aeol"
 )
 
 func main() {
@@ -52,13 +52,13 @@ func main() {
 		}
 		fmt.Println()
 
-		if err := processFile(inPath, outPath, renderPath, sonora.NsLevel(*nsLevel), *noNs, *noAgc, *noHpf); err != nil {
+		if err := processFile(inPath, outPath, renderPath, aeol.NsLevel(*nsLevel), *noNs, *noAgc, *noHpf); err != nil {
 			fmt.Fprintf(os.Stderr, "  error: %v\n", err)
 		}
 	}
 }
 
-func processFile(capturePath, outPath, renderPath string, nsLevel sonora.NsLevel, noNs, noAgc, noHpf bool) error {
+func processFile(capturePath, outPath, renderPath string, nsLevel aeol.NsLevel, noNs, noAgc, noHpf bool) error {
 	capHdr, capSamples, err := readWav(capturePath)
 	if err != nil {
 		return fmt.Errorf("read capture: %w", err)
@@ -73,18 +73,18 @@ func processFile(capturePath, outPath, renderPath string, nsLevel sonora.NsLevel
 
 	frameSize := int(sampleRate) / 100 * int(numChannels)
 
-	builder := sonora.NewBuilder().
+	builder := aeol.NewBuilder().
 		SampleRate(sampleRate).
 		Channels(numChannels)
 
 	if !noNs {
-		builder.EnableNoiseSuppression(sonora.NsConfig{Level: nsLevel})
+		builder.EnableNoiseSuppression(aeol.NsConfig{Level: nsLevel})
 	}
 	if !noHpf {
-		builder.EnableHighPassFilter(sonora.DefaultHighPassFilterConfig())
+		builder.EnableHighPassFilter(aeol.DefaultHighPassFilterConfig())
 	}
 	if !noAgc {
-		agcCfg := sonora.DefaultGainController2Config()
+		agcCfg := aeol.DefaultGainController2Config()
 		agcCfg.Enabled = true
 		agcCfg.AdaptiveDigital.HeadroomDb = 0
 		builder.EnableGainController2(agcCfg)
@@ -103,7 +103,7 @@ func processFile(capturePath, outPath, renderPath string, nsLevel sonora.NsLevel
 				sampleRate, numChannels, rHdr.sampleRate, rHdr.numChannels)
 		}
 		renderSamples = rSamples
-		builder.EnableEchoCanceller(sonora.DefaultEchoCancellerConfig())
+		builder.EnableEchoCanceller(aeol.DefaultEchoCancellerConfig())
 	}
 
 	ap, err := builder.Build()

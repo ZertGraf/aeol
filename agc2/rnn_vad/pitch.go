@@ -1,6 +1,6 @@
 package rnn_vad
 
-import "sonora/fft"
+import "aeol/fft"
 
 const fftSize512 = 512
 

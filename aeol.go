@@ -1,14 +1,14 @@
-package sonora
+package aeol
 
 import (
 	"fmt"
 	"math"
 	"sync"
 
-	"sonora/aec3"
-	agc "sonora/agc2"
-	"sonora/hpf"
-	"sonora/ns"
+	"aeol/aec3"
+	agc "aeol/agc2"
+	"aeol/hpf"
+	"aeol/ns"
 )
 
 // AudioProcessing is the main entry point for the audio processing pipeline.

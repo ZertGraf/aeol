@@ -24,7 +24,7 @@ import (
 	"runtime"
 	"unsafe"
 
-	"sonora/fft"
+	"aeol/fft"
 )
 
 // FFT wraps a PFFFT real-valued transform of size N.

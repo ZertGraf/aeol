@@ -2,7 +2,7 @@ package rnn_vad
 
 import (
 	"math"
-	"sonora/dsp"
+	"aeol/dsp"
 )
 
 const kOpusBands24kHz = 20

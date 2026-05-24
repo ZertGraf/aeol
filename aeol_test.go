@@ -1,4 +1,4 @@
-package sonora
+package aeol
 
 import (
 	"math"

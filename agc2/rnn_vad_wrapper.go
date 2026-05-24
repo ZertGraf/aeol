@@ -1,8 +1,8 @@
 package agc2
 
 import (
-	"sonora/agc2/rnn_vad"
-	"sonora/dsp"
+	"aeol/agc2/rnn_vad"
+	"aeol/dsp"
 )
 
 // Ensure RNNVADWrapper implements VADAnalyzer interface.

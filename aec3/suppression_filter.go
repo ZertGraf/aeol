@@ -1,7 +1,7 @@
 package aec3
 
 import (
-	"sonora/fft"
+	"aeol/fft"
 )
 
 // SuppressionFilter applies frequency-domain Wiener-like gain to the error signal

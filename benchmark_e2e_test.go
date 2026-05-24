@@ -1,4 +1,4 @@
-package sonora
+package aeol
 
 import (
 	"fmt"
@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"sonora/aec3"
-	agc "sonora/agc2"
-	"sonora/dsp"
-	"sonora/ns"
+	"aeol/aec3"
+	agc "aeol/agc2"
+	"aeol/dsp"
+	"aeol/ns"
 )
 
 const (

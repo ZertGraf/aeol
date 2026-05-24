@@ -1,6 +1,6 @@
 package aec3
 
-import "sonora/fft"
+import "aeol/fft"
 
 const (
 	FFTLength    = FFTSize

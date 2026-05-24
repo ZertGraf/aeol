@@ -1,4 +1,4 @@
-package sonora
+package aeol
 
 type AudioProcessingStats struct {
 	OutputRmsDbfs                   *float64

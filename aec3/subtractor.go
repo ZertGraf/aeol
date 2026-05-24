@@ -2,7 +2,7 @@ package aec3
 
 import (
 	"math"
-	"sonora/fft"
+	"aeol/fft"
 )
 
 const (

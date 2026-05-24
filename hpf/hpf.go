@@ -1,8 +1,8 @@
-// Package hpf implements a high-pass filter stage for the sonora pipeline.
+// Package hpf implements a high-pass filter stage for the aeol pipeline.
 // The filter operates on FloatS16 data (float32 values in [-32768, 32767]).
 package hpf
 
-import "sonora/dsp"
+import "aeol/dsp"
 
 // biquad coefficients keyed by sample rate.
 // derived from WebRTC's high_pass_filter.cc (M145).

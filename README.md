@@ -21,8 +21,8 @@ The module path will change when the library moves to its public repository.
 For now, use a `replace` directive in your `go.mod`:
 
 ```
-require sonora v0.0.0
-replace sonora => ../path/to/sonora
+require aeol v0.0.0
+replace aeol => ../path/to/aeol
 ```
 
 No CGO required. Zero external dependencies.
@@ -32,12 +32,12 @@ No CGO required. Zero external dependencies.
 ### Pipeline mode (convenience wrapper)
 
 ```go
-ap, _ := sonora.NewBuilder().
+ap, _ := aeol.NewBuilder().
     SampleRate(48000).
     Channels(1).
-    EnableNoiseSuppression(sonora.DefaultNsConfig()).
-    EnableEchoCanceller(sonora.DefaultEchoCancellerConfig()).
-    EnableGainController2(sonora.DefaultGainController2Config()).
+    EnableNoiseSuppression(aeol.DefaultNsConfig()).
+    EnableEchoCanceller(aeol.DefaultEchoCancellerConfig()).
+    EnableGainController2(aeol.DefaultGainController2Config()).
     Build()
 defer ap.Close()
 
@@ -49,7 +49,7 @@ ap.ProcessCaptureFloatNormalized([][]float32{captureFrame})
 ### Standalone stages
 
 ```go
-import "sonora/ns"
+import "aeol/ns"
 
 suppressor := ns.NewSuppressor(ns.Config{Level: ns.High})
 
@@ -58,7 +58,7 @@ suppressor.Process(frame)
 ```
 
 ```go
-import "sonora/aec3"
+import "aeol/aec3"
 
 ec := aec3.NewEchoCanceller3(aec3.DefaultConfig(), 16000, 1)
 
@@ -68,7 +68,7 @@ ec.ProcessCapture(captureBlock)
 ```
 
 ```go
-import "sonora/agc2"
+import "aeol/agc2"
 
 gc := agc2.NewGainController2(agc2.DefaultConfig())
 gc.Process(frame) // any frame size
@@ -79,7 +79,7 @@ gc.Process(frame) // any frame size
 NS and AEC3 operate at 16 kHz internally. For higher sample rates, split into bands first:
 
 ```go
-import "sonora/bands"
+import "aeol/bands"
 
 sp := bands.New(48000) // 3 bands for 48 kHz
 
@@ -102,8 +102,8 @@ The pipeline wrapper accepts three formats:
 
 Conversion helpers:
 ```go
-sonora.ToFloatS16(samples)   // [-1,1] -> [-32768, 32767]
-sonora.FromFloatS16(samples) // [-32768, 32767] -> [-1,1]
+aeol.ToFloatS16(samples)   // [-1,1] -> [-32768, 32767]
+aeol.FromFloatS16(samples) // [-32768, 32767] -> [-1,1]
 ```
 
 ## FFT Backend
@@ -111,7 +111,7 @@ sonora.FromFloatS16(samples) // [-32768, 32767] -> [-1,1]
 The default FFT is a pure Go Ooura implementation. For 5-10x faster transforms, use the PFFFT backend (requires CGO + C compiler):
 
 ```go
-import "sonora/fft/pffft"
+import "aeol/fft/pffft"
 
 suppressor := ns.NewSuppressor(cfg, pffft.Factory)
 ec := aec3.NewEchoCanceller3(aec3.DefaultConfig(), rate, 1, pffft.Factory)
@@ -129,7 +129,7 @@ cd third_party/rnnoise && ./vendor.sh  # or .\vendor.ps1 on Windows
 ```
 
 ```go
-import "sonora/rnnoise"
+import "aeol/rnnoise"
 
 d := rnnoise.New()
 defer d.Close()
@@ -148,23 +148,23 @@ gc := agc2.NewGainController2(cfg, rnnoise.NewVADAdapter())
 Build as a shared library for use from C, Python, Rust, etc.:
 
 ```bash
-go build -buildmode=c-shared -o libsonora.so ./capi/
+go build -buildmode=c-shared -o aeol.dll ./capi/
 ```
 
-See [`capi/sonora.h`](capi/sonora.h) for the full API. Each stage is independent — create one handle per channel:
+See [`capi/aeol.h`](capi/aeol.h) for the full API. Each stage is independent — create one handle per channel:
 
 ```c
-#include "sonora.h"
+#include "aeol.h"
 
-sonora_handle ns = sonora_ns_create(2); // level=high
-sonora_ns_process(ns, samples, 160);
-sonora_ns_destroy(ns);
+aeol_handle ns = aeol_ns_create(2); // level=high
+aeol_ns_process(ns, samples, 160);
+aeol_ns_destroy(ns);
 ```
 
 ## Project Structure
 
 ```
-sonora.go        main AudioProcessing, capture/render paths
+aeol.go          main AudioProcessing, capture/render paths
 builder.go       Builder pattern API
 config.go        configuration types and defaults
 stream.go        StreamConfig, format conversion helpers

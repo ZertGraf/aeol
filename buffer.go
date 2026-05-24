@@ -1,9 +1,9 @@
-package sonora
+package aeol
 
 import (
 	"math"
 
-	"sonora/dsp"
+	"aeol/dsp"
 )
 
 // AudioBuffer holds one 10 ms frame of audio in de-interleaved, FloatS16 format.

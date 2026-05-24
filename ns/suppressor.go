@@ -3,7 +3,7 @@ package ns
 import (
 	"math"
 
-	"sonora/fft"
+	"aeol/fft"
 )
 
 // Suppressor performs spectral subtraction noise suppression using overlap-add FFT processing.

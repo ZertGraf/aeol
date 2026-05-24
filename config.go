@@ -1,4 +1,4 @@
-package sonora
+package aeol
 
 // NsLevel controls the aggressiveness of the noise suppressor.
 // higher values remove more noise but may also suppress speech.
