@@ -222,12 +222,13 @@ func (sub *Subtractor) Process(renderBuffer *RenderBuffer, captureFft *FftData, 
 		sub.poorCoarseFilterCount = 0
 	}
 
-	if sub.poorCoarseFilterCount < poorCoarseThreshold {
+	if sub.coarseResetHangover > 0 {
+		sub.coarseResetHangover--
+	}
+
+	if sub.poorCoarseFilterCount < poorCoarseThreshold || sub.coarseResetHangover > 0 {
 		coarseStep := computeStepSize(renderPower, sub.config.Coarse.InitialScale)
 		sub.coarseFilter.Adapt(renderBuffer, &sub.scratchECoarseFft, coarseStep)
-		if sub.coarseResetHangover > 0 {
-			sub.coarseResetHangover--
-		}
 	} else {
 		sub.poorCoarseFilterCount = 0
 		sub.coarseFilter.CopyFrom(sub.refinedFilter)
@@ -241,6 +242,11 @@ func (sub *Subtractor) Process(renderBuffer *RenderBuffer, captureFft *FftData, 
 			output.ERefined[k] = outputClampMax
 		} else if output.ERefined[k] < outputClampMin {
 			output.ERefined[k] = outputClampMin
+		}
+		if output.ECoarse[k] > outputClampMax {
+			output.ECoarse[k] = outputClampMax
+		} else if output.ECoarse[k] < outputClampMin {
+			output.ECoarse[k] = outputClampMin
 		}
 	}
 }

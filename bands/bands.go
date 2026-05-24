@@ -35,8 +35,13 @@ type Splitter struct {
 }
 
 // New creates a Splitter for the given sample rate.
-// Returns nil if the sample rate is not supported (must be 16000, 32000, or 48000).
+// Supported rates: 16000, 32000, 48000. Returns nil for unsupported rates.
 func New(sampleRateHz uint32) *Splitter {
+	switch sampleRateHz {
+	case 16000, 32000, 48000:
+	default:
+		return nil
+	}
 	n := numBands(sampleRateHz)
 	frameLen := int(sampleRateHz) / 100
 	bandLen := frameLen / n

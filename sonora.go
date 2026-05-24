@@ -363,13 +363,13 @@ func (ap *AudioProcessing) ApplyConfig(config Config) error {
 		ap.highPassFilters = nil
 	}
 
-	if config.NoiseSuppressionEnabled() {
+	if config.NoiseSuppressionEnabled() && len(ap.noiseSuppressors) == 0 {
 		nsCfg := ns.Config{Level: ns.SuppressionLevel(config.NoiseSuppression.Level)}
 		ap.noiseSuppressors = make([]*ns.Suppressor, numChannels)
 		for ch := 0; ch < numChannels; ch++ {
 			ap.noiseSuppressors[ch] = ns.NewSuppressor(nsCfg)
 		}
-	} else {
+	} else if !config.NoiseSuppressionEnabled() {
 		ap.noiseSuppressors = nil
 	}
 

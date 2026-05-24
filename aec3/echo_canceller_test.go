@@ -103,3 +103,77 @@ func BenchmarkEchoCanceller3(b *testing.B) {
 		ec.ProcessCapture(capture)
 	}
 }
+
+func BenchmarkAdaptiveFilter_Filter(b *testing.B) {
+	cfg := DefaultConfig()
+	af := NewAdaptiveFilter(cfg.Filter.Refined.LengthBlocks)
+	rb := NewRenderBuffer(cfg.Filter.Refined.LengthBlocks + 8)
+
+	// fill render buffer with non-zero data so the filter does real work
+	for i := 0; i < rb.Size(); i++ {
+		var d FftData
+		for k := range d.Re {
+			d.Re[k] = float32(k+1) * 0.01
+			d.Im[k] = float32(k) * 0.005
+		}
+		rb.Insert(&d)
+	}
+
+	var out FftData
+	b.ResetTimer()
+	for range b.N {
+		af.Filter(rb, &out)
+	}
+}
+
+func BenchmarkAdaptiveFilter_Adapt(b *testing.B) {
+	cfg := DefaultConfig()
+	af := NewAdaptiveFilter(cfg.Filter.Refined.LengthBlocks)
+	rb := NewRenderBuffer(cfg.Filter.Refined.LengthBlocks + 8)
+
+	for i := 0; i < rb.Size(); i++ {
+		var d FftData
+		for k := range d.Re {
+			d.Re[k] = float32(k+1) * 0.01
+			d.Im[k] = float32(k) * 0.005
+		}
+		rb.Insert(&d)
+	}
+
+	var err FftData
+	for k := range err.Re {
+		err.Re[k] = float32(k) * 0.001
+		err.Im[k] = float32(k) * 0.0005
+	}
+
+	b.ResetTimer()
+	for range b.N {
+		af.Adapt(rb, &err, 0.01)
+	}
+}
+
+func BenchmarkAdaptiveFilter_FilterAndAdapt(b *testing.B) {
+	cfg := DefaultConfig()
+	af := NewAdaptiveFilter(cfg.Filter.Refined.LengthBlocks)
+	rb := NewRenderBuffer(cfg.Filter.Refined.LengthBlocks + 8)
+
+	for i := 0; i < rb.Size(); i++ {
+		var d FftData
+		for k := range d.Re {
+			d.Re[k] = float32(k+1) * 0.01
+			d.Im[k] = float32(k) * 0.005
+		}
+		rb.Insert(&d)
+	}
+
+	var out, err FftData
+	for k := range err.Re {
+		err.Re[k] = float32(k) * 0.001
+	}
+
+	b.ResetTimer()
+	for range b.N {
+		af.Filter(rb, &out)
+		af.Adapt(rb, &err, 0.01)
+	}
+}

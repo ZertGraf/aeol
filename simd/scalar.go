@@ -105,6 +105,14 @@ func (s *scalarBackend) ComplexMultiplyAccumulateStandard(reA, imA, reB, imB, re
 	}
 }
 
+func (s *scalarBackend) ScaledComplexMultiplyAccumulate(reA, imA, reB, imB, reOut, imOut []float32, scale float32) {
+	n := min(len(reA), min(len(imA), min(len(reB), min(len(imB), min(len(reOut), len(imOut))))))
+	for i := 0; i < n; i++ {
+		reOut[i] += scale * (reA[i]*reB[i] + imA[i]*imB[i])
+		imOut[i] += scale * (-reA[i]*imB[i] + imA[i]*reB[i])
+	}
+}
+
 func (s *scalarBackend) ConvolveSinc(input []float32, k1, k2 []float64, factor float64) float32 {
 	n := min(len(input), min(len(k1), len(k2)))
 	var sum1, sum2 float64

@@ -165,6 +165,33 @@ func (a *avx2Backend) ComplexMultiplyAccumulateStandard(reA, imA, reB, imB, reOu
 	}
 }
 
+func (a *avx2Backend) ScaledComplexMultiplyAccumulate(reA, imA, reB, imB, reOut, imOut []float32, scale float32) {
+	n := min(len(reA), min(len(imA), min(len(reB), min(len(imB), min(len(reOut), len(imOut))))))
+	i := 0
+	for ; i+7 < n; i += 8 {
+		reOut[i] += scale * (reA[i]*reB[i] + imA[i]*imB[i])
+		reOut[i+1] += scale * (reA[i+1]*reB[i+1] + imA[i+1]*imB[i+1])
+		reOut[i+2] += scale * (reA[i+2]*reB[i+2] + imA[i+2]*imB[i+2])
+		reOut[i+3] += scale * (reA[i+3]*reB[i+3] + imA[i+3]*imB[i+3])
+		reOut[i+4] += scale * (reA[i+4]*reB[i+4] + imA[i+4]*imB[i+4])
+		reOut[i+5] += scale * (reA[i+5]*reB[i+5] + imA[i+5]*imB[i+5])
+		reOut[i+6] += scale * (reA[i+6]*reB[i+6] + imA[i+6]*imB[i+6])
+		reOut[i+7] += scale * (reA[i+7]*reB[i+7] + imA[i+7]*imB[i+7])
+		imOut[i] += scale * (-reA[i]*imB[i] + imA[i]*reB[i])
+		imOut[i+1] += scale * (-reA[i+1]*imB[i+1] + imA[i+1]*reB[i+1])
+		imOut[i+2] += scale * (-reA[i+2]*imB[i+2] + imA[i+2]*reB[i+2])
+		imOut[i+3] += scale * (-reA[i+3]*imB[i+3] + imA[i+3]*reB[i+3])
+		imOut[i+4] += scale * (-reA[i+4]*imB[i+4] + imA[i+4]*reB[i+4])
+		imOut[i+5] += scale * (-reA[i+5]*imB[i+5] + imA[i+5]*reB[i+5])
+		imOut[i+6] += scale * (-reA[i+6]*imB[i+6] + imA[i+6]*reB[i+6])
+		imOut[i+7] += scale * (-reA[i+7]*imB[i+7] + imA[i+7]*reB[i+7])
+	}
+	for ; i < n; i++ {
+		reOut[i] += scale * (reA[i]*reB[i] + imA[i]*imB[i])
+		imOut[i] += scale * (-reA[i]*imB[i] + imA[i]*reB[i])
+	}
+}
+
 func (a *avx2Backend) ConvolveSinc(input []float32, k1, k2 []float64, factor float64) float32 {
 	n := min(len(input), min(len(k1), len(k2)))
 	var sum1, sum2 float64

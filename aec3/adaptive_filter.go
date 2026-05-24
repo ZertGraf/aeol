@@ -1,10 +1,13 @@
 package aec3
 
+import "sonora/simd"
+
 // AdaptiveFilter is a frequency-domain NLMS filter that models the echo path.
 // coefficients are stored as complex spectra, one FftData per filter block.
 type AdaptiveFilter struct {
 	filterLength int
 	coeffs       []FftData
+	backend      simd.Backend
 }
 
 // NewAdaptiveFilter allocates an AdaptiveFilter with lengthBlocks complex-spectrum coefficient blocks.
@@ -12,6 +15,7 @@ func NewAdaptiveFilter(lengthBlocks int) *AdaptiveFilter {
 	return &AdaptiveFilter{
 		filterLength: lengthBlocks,
 		coeffs:       make([]FftData, lengthBlocks),
+		backend:      simd.Default(),
 	}
 }
 
@@ -19,34 +23,37 @@ func NewAdaptiveFilter(lengthBlocks int) *AdaptiveFilter {
 // with the render spectra from renderBuffer, writing the result into output.
 func (af *AdaptiveFilter) Filter(renderBuffer *RenderBuffer, output *FftData) {
 	output.Clear()
-	outRe := &output.Re
-	outIm := &output.Im
+	outRe := output.Re[:]
+	outIm := output.Im[:]
 	for i := 0; i < af.filterLength; i++ {
 		c := &af.coeffs[i]
 		r := renderBuffer.Block(i)
-		for k := 0; k < FFTSizeBy2Plus1; k++ {
-			outRe[k] += c.Re[k]*r.Re[k] - c.Im[k]*r.Im[k]
-			outIm[k] += c.Re[k]*r.Im[k] + c.Im[k]*r.Re[k]
-		}
+		// standard complex multiply-accumulate: out += c * r
+		af.backend.ComplexMultiplyAccumulateStandard(
+			c.Re[:], c.Im[:],
+			r.Re[:], r.Im[:],
+			outRe, outIm,
+		)
 	}
 }
 
 // Adapt updates the filter coefficients using the NLMS gradient step:
 // coeffs += stepSize * conj(render) * error, applied per frequency bin.
 func (af *AdaptiveFilter) Adapt(renderBuffer *RenderBuffer, errSignal *FftData, stepSize float32) {
-	eRe := &errSignal.Re
-	eIm := &errSignal.Im
+	eRe := errSignal.Re[:]
+	eIm := errSignal.Im[:]
 	for i := 0; i < af.filterLength; i++ {
 		c := &af.coeffs[i]
 		r := renderBuffer.Block(i)
-		rRe := &r.Re
-		rIm := &r.Im
-		for k := 0; k < FFTSizeBy2Plus1; k++ {
-			er := eRe[k]
-			ei := eIm[k]
-			c.Re[k] += stepSize * (er*rRe[k] + ei*rIm[k])
-			c.Im[k] += stepSize * (-er*rIm[k] + ei*rRe[k])
-		}
+		// conjugate multiply-accumulate scaled by stepSize:
+		// c.Re += step*(r.Re*e.Re + r.Im*e.Im)
+		// c.Im += step*(-r.Re*e.Im + r.Im*e.Re)
+		af.backend.ScaledComplexMultiplyAccumulate(
+			r.Re[:], r.Im[:],
+			eRe, eIm,
+			c.Re[:], c.Im[:],
+			stepSize,
+		)
 	}
 }
 

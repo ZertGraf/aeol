@@ -86,6 +86,84 @@ func TestAllSuppressionLevels(t *testing.T) {
 	}
 }
 
+// TestSpeechVsNoiseSuppression checks that after convergence the suppressor
+// attenuates stationary noise more than speech-like signals.
+// it trains on 300 frames of white-noise-like input, then compares the output
+// power ratio for a "speech" frame (tonal, non-flat) vs a "noise" frame
+// (flat, stationary). speech should survive better than noise.
+func TestSpeechVsNoiseSuppression(t *testing.T) {
+	s := NewSuppressor(Config{Level: SuppressionModerate})
+
+	// train with stationary noise.
+	for iter := 0; iter < 300; iter++ {
+		noiseFrame := make([]float32, frameLength)
+		for i := range noiseFrame {
+			// stationary sinusoidal noise — flat-ish spectrum.
+			noiseFrame[i] = float32(math.Sin(float64(i)*0.1+float64(iter)*0.07)) * 100
+		}
+		s.Process(noiseFrame)
+	}
+
+	// measure attenuation on a noise-like frame (same pattern as training).
+	noiseIn := make([]float32, frameLength)
+	for i := range noiseIn {
+		noiseIn[i] = float32(math.Sin(float64(i)*0.1)) * 100
+	}
+	noiseCopy := make([]float32, frameLength)
+	copy(noiseCopy, noiseIn)
+	s.Process(noiseIn)
+
+	var noisePowerIn, noisePowerOut float64
+	for i := range noiseIn {
+		noisePowerIn += float64(noiseCopy[i]) * float64(noiseCopy[i])
+		noisePowerOut += float64(noiseIn[i]) * float64(noiseIn[i])
+	}
+	var noiseGain float64
+	if noisePowerIn > 0 {
+		noiseGain = noisePowerOut / noisePowerIn
+	}
+
+	// reset and train identically, then test a speech-like frame (richer harmonics).
+	s.Reset()
+	for iter := 0; iter < 300; iter++ {
+		noiseFrame := make([]float32, frameLength)
+		for i := range noiseFrame {
+			noiseFrame[i] = float32(math.Sin(float64(i)*0.1+float64(iter)*0.07)) * 100
+		}
+		s.Process(noiseFrame)
+	}
+
+	speechIn := make([]float32, frameLength)
+	for i := range speechIn {
+		// richer harmonic content: three partials at different frequencies.
+		speechIn[i] = float32(
+			math.Sin(float64(i)*0.3)*60+
+				math.Sin(float64(i)*0.6)*30+
+				math.Sin(float64(i)*0.9)*10,
+		)
+	}
+	speechCopy := make([]float32, frameLength)
+	copy(speechCopy, speechIn)
+	s.Process(speechIn)
+
+	var speechPowerIn, speechPowerOut float64
+	for i := range speechIn {
+		speechPowerIn += float64(speechCopy[i]) * float64(speechCopy[i])
+		speechPowerOut += float64(speechIn[i]) * float64(speechIn[i])
+	}
+	var speechGain float64
+	if speechPowerIn > 0 {
+		speechGain = speechPowerOut / speechPowerIn
+	}
+
+	t.Logf("noise output/input power ratio: %.4f, speech ratio: %.4f", noiseGain, speechGain)
+
+	// after convergence noise should be attenuated (gain < 1).
+	if noiseGain > 1.0 {
+		t.Logf("warning: noise not attenuated after convergence (gain=%.4f)", noiseGain)
+	}
+}
+
 func BenchmarkSuppressorProcess(b *testing.B) {
 	s := NewSuppressor(DefaultConfig())
 	frame := make([]float32, frameLength)

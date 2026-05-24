@@ -122,3 +122,69 @@ func BenchmarkPowerSpectrum(b *testing.B) {
 		backend.PowerSpectrum(re, im, out)
 	}
 }
+
+func TestScaledComplexMultiplyAccumulate(t *testing.T) {
+	backends := []struct {
+		name    string
+		backend Backend
+	}{
+		{"scalar", &scalarBackend{}},
+		{"default", Default()},
+	}
+	for _, tc := range backends {
+		t.Run(tc.name, func(t *testing.T) {
+			// hand-computed: reA=1,imA=2; reB=3,imB=4; scale=0.5
+			// reOut += 0.5*(1*3 + 2*4) = 0.5*11 = 5.5
+			// imOut += 0.5*(-1*4 + 2*3) = 0.5*2 = 1.0
+			reA := []float32{1}
+			imA := []float32{2}
+			reB := []float32{3}
+			imB := []float32{4}
+			reOut := []float32{0}
+			imOut := []float32{0}
+			tc.backend.ScaledComplexMultiplyAccumulate(reA, imA, reB, imB, reOut, imOut, 0.5)
+			if math.Abs(float64(reOut[0]-5.5)) > 1e-6 {
+				t.Errorf("%s: reOut = %f, want 5.5", tc.name, reOut[0])
+			}
+			if math.Abs(float64(imOut[0]-1.0)) > 1e-6 {
+				t.Errorf("%s: imOut = %f, want 1.0", tc.name, imOut[0])
+			}
+		})
+	}
+}
+
+func BenchmarkScaledComplexMultiplyAccumulate(b *testing.B) {
+	backend := Default()
+	n := 65 // FFTSizeBy2Plus1
+	reA := make([]float32, n)
+	imA := make([]float32, n)
+	reB := make([]float32, n)
+	imB := make([]float32, n)
+	reOut := make([]float32, n)
+	imOut := make([]float32, n)
+	for i := 0; i < n; i++ {
+		reA[i] = float32(i) * 0.01
+		imA[i] = float32(i) * 0.005
+		reB[i] = float32(i) * 0.02
+		imB[i] = float32(i) * 0.01
+	}
+	b.ResetTimer()
+	for range b.N {
+		backend.ScaledComplexMultiplyAccumulate(reA, imA, reB, imB, reOut, imOut, 0.01)
+	}
+}
+
+func BenchmarkComplexMultiplyAccumulateStandard(b *testing.B) {
+	backend := Default()
+	n := 65 // FFTSizeBy2Plus1
+	reA := make([]float32, n)
+	imA := make([]float32, n)
+	reB := make([]float32, n)
+	imB := make([]float32, n)
+	reOut := make([]float32, n)
+	imOut := make([]float32, n)
+	b.ResetTimer()
+	for range b.N {
+		backend.ComplexMultiplyAccumulateStandard(reA, imA, reB, imB, reOut, imOut)
+	}
+}

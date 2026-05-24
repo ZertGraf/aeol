@@ -54,7 +54,8 @@ func InverseSplit(f FFT, rIn, iIn []float32, data []float32) {
 const (
 	// OouraFFTSize is the default FFT size used by AEC3 (128 points).
 	OouraFFTSize = 128
-	// OouraFFTHalf is the number of unique complex bins for a 128-point real FFT (64).
+	// OouraFFTHalf is N/2 — half the FFT size. the number of unique complex bins
+	// for a real FFT is N/2+1 (see aec3.FFTSizeBy2Plus1).
 	OouraFFTHalf = OouraFFTSize / 2
 )
 

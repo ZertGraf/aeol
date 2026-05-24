@@ -130,6 +130,10 @@ func (s *Suppressor) Process(frame []float32) {
 // Reset clears all internal state including overlap buffers, noise estimator, and synthesis state.
 // call this when reusing a Suppressor for a new audio stream.
 func (s *Suppressor) Reset() {
+	s.noiseEst = newNoiseEstimator()
+	s.wiener = newWienerFilter()
+	s.speechProbEst = newSpeechProbabilityEstimator()
+	s.signalModelEst = newSignalModelEstimator()
 	clear(s.overlapBuf[:])
 	clear(s.synthOverlap[:])
 	clear(s.analysisBuffer[:])

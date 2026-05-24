@@ -2,6 +2,13 @@ package agc2
 
 import "math"
 
+// VADAnalyzer estimates speech probability for a frame of audio.
+// Analyze returns a value in [0, 1]. Reset clears internal state.
+type VADAnalyzer interface {
+	Analyze(samples []float32) float32
+	Reset()
+}
+
 // VoiceActivityDetector estimates speech probability per frame using RMS-based
 // thresholding with a hangover to avoid premature drop-off at the end of speech.
 type VoiceActivityDetector struct {

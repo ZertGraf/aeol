@@ -41,6 +41,12 @@ type Backend interface {
 	ComplexMultiplyAccumulate(reA, imA, reB, imB, reOut, imOut []float32)
 	ComplexMultiplyAccumulateStandard(reA, imA, reB, imB, reOut, imOut []float32)
 
+	// ScaledComplexMultiplyAccumulate computes the scaled conjugate-multiply-accumulate:
+	//   outRe[k] += scale * (reA[k]*reB[k] + imA[k]*imB[k])
+	//   outIm[k] += scale * (-reA[k]*imB[k] + imA[k]*reB[k])
+	// used for NLMS adaptive filter coefficient updates.
+	ScaledComplexMultiplyAccumulate(reA, imA, reB, imB, reOut, imOut []float32, scale float32)
+
 	ConvolveSinc(input []float32, k1, k2 []float64, factor float64) float32
 }
 

@@ -11,21 +11,26 @@ type AdaptiveDigitalGainController struct {
 	speechEstimator   *speechLevelEstimator
 	noiseEstimator    *noiseLevelEstimator
 	satProtector      *saturationProtector
-	vad               *VoiceActivityDetector
+	vad               VADAnalyzer
 	limiterInst       *limiter
 	currentGainDb     float32
 }
 
 // NewAdaptiveDigitalGainController creates the adaptive gain stage with the given config.
 // InitialGainDb sets the starting gain before any speech has been observed.
-func NewAdaptiveDigitalGainController(config AdaptiveDigitalConfig) *AdaptiveDigitalGainController {
+// an optional VADAnalyzer overrides the default energy-based VAD.
+func NewAdaptiveDigitalGainController(config AdaptiveDigitalConfig, vad ...VADAnalyzer) *AdaptiveDigitalGainController {
+	var v VADAnalyzer = NewVoiceActivityDetector()
+	if len(vad) > 0 && vad[0] != nil {
+		v = vad[0]
+	}
 	return &AdaptiveDigitalGainController{
 		config:          config,
 		gainApplier:     newGainApplier(config.InitialGainDb),
 		speechEstimator: newSpeechLevelEstimator(-30),
 		noiseEstimator:  newNoiseLevelEstimator(),
 		satProtector:    newSaturationProtector(),
-		vad:             NewVoiceActivityDetector(),
+		vad:             v,
 		limiterInst:     newLimiter(),
 		currentGainDb:   config.InitialGainDb,
 	}
@@ -114,13 +119,14 @@ type GainController2 struct {
 // NewGainController2 creates a GainController2 from the given config.
 // FixedDigital.GainDb of 0 means unity (no fixed gain). set AdaptiveDigital.Enabled to
 // activate the adaptive stage; otherwise only the fixed gain is applied.
-func NewGainController2(config Config) *GainController2 {
+// an optional VADAnalyzer overrides the default energy-based VAD used by the adaptive stage.
+func NewGainController2(config Config, vad ...VADAnalyzer) *GainController2 {
 	gc := &GainController2{
 		config:    config,
 		fixedGain: dbToLinear(config.FixedDigital.GainDb),
 	}
 	if config.AdaptiveDigital.Enabled {
-		gc.adaptive = NewAdaptiveDigitalGainController(config.AdaptiveDigital)
+		gc.adaptive = NewAdaptiveDigitalGainController(config.AdaptiveDigital, vad...)
 	}
 	return gc
 }

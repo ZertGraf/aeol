@@ -17,8 +17,12 @@ Designed as a **toolkit of independent stages**, not a monolithic pipeline. Each
 
 ## Install
 
-```bash
-go get sonora
+The module path will change when the library moves to its public repository.
+For now, use a `replace` directive in your `go.mod`:
+
+```
+require sonora v0.0.0
+replace sonora => ../path/to/sonora
 ```
 
 No CGO required. Zero external dependencies.
@@ -115,6 +119,30 @@ ec := aec3.NewEchoCanceller3(aec3.DefaultConfig(), rate, 1, pffft.Factory)
 
 PFFFT uses SSE on x86, NEON on ARM, scalar fallback otherwise.
 
+## RNNoise Backend
+
+Neural-network-based noise suppression via [RNNoise](https://github.com/xiph/rnnoise) (requires CGO + C compiler). Operates at 48 kHz on 480-sample frames. Also provides a VAD probability as a bonus output.
+
+```bash
+# vendor C sources (one-time)
+cd third_party/rnnoise && ./vendor.sh  # or .\vendor.ps1 on Windows
+```
+
+```go
+import "sonora/rnnoise"
+
+d := rnnoise.New()
+defer d.Close()
+
+vadProb := d.ProcessFrame(frame480)  // 480 FloatS16 samples, in-place
+```
+
+RNNoise VAD can also feed AGC2 via the adapter:
+
+```go
+gc := agc2.NewGainController2(cfg, rnnoise.NewVADAdapter())
+```
+
 ## C API (FFI)
 
 Build as a shared library for use from C, Python, Rust, etc.:
@@ -149,6 +177,8 @@ bands/           frequency band splitting (standalone)
 dsp/             splitting filter, biquad, sinc resampler
 fft/             FFT interface + pure Go backend
 fft/pffft/       PFFFT CGO backend (optional)
+rnnoise/         RNNoise CGO wrapper (optional)
+third_party/     vendored C sources (pffft, rnnoise)
 simd/            runtime-selectable SIMD backends
 capi/            C shared library exports
 cmd/process_wav  batch WAV processing utility
