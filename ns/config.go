@@ -4,6 +4,15 @@
 // 256-point FFT with 129 frequency bins. It estimates the noise spectrum
 // using quantile tracking and applies Wiener filtering to suppress noise
 // while preserving speech.
+//
+// This package processes the 0-8kHz band only. For higher sample rates
+// (32kHz, 48kHz), the caller must split into frequency bands first, run
+// Process on the lowest band (16kHz), and apply ProcessUpperBand to each
+// upper band separately. See the dsp package for band splitting utilities.
+//
+// All samples are in FloatS16 format (float32 in [-32768, 32767]).
+//
+// Instances are not safe for concurrent use; synchronization is the caller's responsibility.
 package ns
 
 const (

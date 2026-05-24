@@ -16,7 +16,7 @@ type EchoCanceller3 struct {
 	sampleRate uint32
 	numBands   int
 
-	fftProcessor *fft.OouraFFT
+	fftProcessor fft.FFT
 	renderBuffer *RenderBuffer
 	subtractor   *Subtractor
 	suppressor   *SuppressionFilter
@@ -47,16 +47,20 @@ type EchoCanceller3 struct {
 	scratchY2        [FFTSizeBy2Plus1]float32
 }
 
-func NewEchoCanceller3(config EchoCanceller3Config, sampleRate uint32, numChannels int) *EchoCanceller3 {
+func NewEchoCanceller3(config EchoCanceller3Config, sampleRate uint32, numChannels int, fftFactory ...fft.Factory) *EchoCanceller3 {
+	factory := fft.DefaultFactory
+	if len(fftFactory) > 0 && fftFactory[0] != nil {
+		factory = fftFactory[0]
+	}
 	numBands := numBandsForRate(sampleRate)
 	ec := &EchoCanceller3{
 		config:       config,
 		sampleRate:   sampleRate,
 		numBands:     numBands,
-		fftProcessor: fft.NewOouraFFT(),
+		fftProcessor: factory(FFTSize),
 		renderBuffer: NewRenderBuffer(config.Filter.Refined.LengthBlocks + config.Delay.DelayHeadroomBlocks + 5),
-		subtractor:   NewSubtractor(config.Filter),
-		suppressor:   NewSuppressionFilter(),
+		subtractor:   NewSubtractor(config.Filter, factory),
+		suppressor:   NewSuppressionFilter(factory),
 		cng:          NewComfortNoiseGenerator(),
 		delayEst:     NewDelayEstimator(config.Delay),
 		renderBlock:  NewBlock(numBands, 1),
@@ -74,7 +78,7 @@ func (ec *EchoCanceller3) ProcessRender(renderFrame []float32) {
 
 	clear(ec.fftBuf[:FFTLengthBy2])
 	copy(ec.fftBuf[FFTLengthBy2:], renderFrame[:BlockSize])
-	ec.fftProcessor.ForwardSplit(ec.fftBuf[:], ec.renderFft.Re[:], ec.renderFft.Im[:])
+	fft.ForwardSplit(ec.fftProcessor, ec.fftBuf[:], ec.renderFft.Re[:], ec.renderFft.Im[:])
 	ec.renderBuffer.Insert(&ec.renderFft)
 
 	copy(ec.renderBlock.View(0, 0), renderFrame[:BlockSize])
@@ -91,7 +95,7 @@ func (ec *EchoCanceller3) ProcessCapture(captureFrame []float32) {
 
 	clear(ec.fftBuf[:FFTLengthBy2])
 	copy(ec.fftBuf[FFTLengthBy2:], captureFrame[:BlockSize])
-	ec.fftProcessor.ForwardSplit(ec.fftBuf[:], ec.captureFft.Re[:], ec.captureFft.Im[:])
+	fft.ForwardSplit(ec.fftProcessor, ec.fftBuf[:], ec.captureFft.Re[:], ec.captureFft.Im[:])
 
 	renderPower := renderSpectrumPower(ec.renderBuffer, ec.config.Filter.Refined.LengthBlocks)
 	ec.subtractor.Process(ec.renderBuffer, &ec.captureFft, renderPower, &ec.subtractorOutput)
@@ -169,7 +173,7 @@ func formLinearFilterOutput(lastRefined bool, useRefined bool, o *SubtractorOutp
 	}
 }
 
-func windowedPaddedFft(fftProc *fft.OouraFFT, v []float32, vOld *[FFTLengthBy2]float32, out *FftData) {
+func windowedPaddedFft(fftProc fft.FFT, v []float32, vOld *[FFTLengthBy2]float32, out *FftData) {
 	paddedFftSqrtHanning(fftProc, v, vOld[:], out)
 	copy(vOld[:], v[:FFTLengthBy2])
 }

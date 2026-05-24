@@ -28,7 +28,7 @@ func TestBuilderWithAllModules(t *testing.T) {
 	defer ap.Close()
 }
 
-func TestProcessCaptureFloat(t *testing.T) {
+func TestProcessCaptureFloatNormalized(t *testing.T) {
 	ap, err := NewBuilder().
 		SampleRate(16000).
 		Channels(1).
@@ -44,13 +44,13 @@ func TestProcessCaptureFloat(t *testing.T) {
 	}
 	data := [][]float32{frame}
 
-	err = ap.ProcessCaptureFloat(data)
+	err = ap.ProcessCaptureFloatNormalized(data)
 	if err != nil {
-		t.Fatalf("ProcessCaptureFloat failed: %v", err)
+		t.Fatalf("ProcessCaptureFloatNormalized failed: %v", err)
 	}
 }
 
-func TestProcessRenderFloat(t *testing.T) {
+func TestProcessRenderFloatNormalized(t *testing.T) {
 	ap, err := NewBuilder().
 		SampleRate(16000).
 		Channels(1).
@@ -67,9 +67,9 @@ func TestProcessRenderFloat(t *testing.T) {
 	}
 	data := [][]float32{frame}
 
-	err = ap.ProcessRenderFloat(data)
+	err = ap.ProcessRenderFloatNormalized(data)
 	if err != nil {
-		t.Fatalf("ProcessRenderFloat failed: %v", err)
+		t.Fatalf("ProcessRenderFloatNormalized failed: %v", err)
 	}
 }
 
@@ -111,7 +111,7 @@ func TestProcessWithNoiseSuppression(t *testing.T) {
 			frame[i] = 0.01 * float32(math.Sin(float64(i)*0.1))
 		}
 		data := [][]float32{frame}
-		if err := ap.ProcessCaptureFloat(data); err != nil {
+		if err := ap.ProcessCaptureFloatNormalized(data); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -134,7 +134,7 @@ func TestProcessWithAGC(t *testing.T) {
 			frame[i] = 0.01 * float32(math.Sin(2*math.Pi*440*float64(i)/16000))
 		}
 		data := [][]float32{frame}
-		if err := ap.ProcessCaptureFloat(data); err != nil {
+		if err := ap.ProcessCaptureFloatNormalized(data); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -154,7 +154,7 @@ func TestStatistics(t *testing.T) {
 	for i := range frame {
 		frame[i] = 0.5
 	}
-	ap.ProcessCaptureFloat([][]float32{frame})
+	ap.ProcessCaptureFloatNormalized([][]float32{frame})
 
 	stats := ap.Statistics()
 	if stats.OutputRmsDbfs == nil {
@@ -243,6 +243,6 @@ func BenchmarkFullPipeline(b *testing.B) {
 
 	b.ResetTimer()
 	for range b.N {
-		ap.ProcessCaptureFloat(data)
+		ap.ProcessCaptureFloatNormalized(data)
 	}
 }

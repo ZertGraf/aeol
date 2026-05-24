@@ -61,16 +61,16 @@ var hanning64 = [FFTLengthBy2]float32{
 	0.022213600, 0.009913760, 0.002484610, 0.000000000,
 }
 
-func zeroPaddedFft(fftProc *fft.OouraFFT, x []float32, out *FftData) {
+func zeroPaddedFft(fftProc fft.FFT, x []float32, out *FftData) {
 	var buf [FFTSize]float32
 	copy(buf[FFTLengthBy2:], x[:FFTLengthBy2])
 	for i := 0; i < FFTLengthBy2; i++ {
 		buf[FFTLengthBy2+i] *= hanning64[i]
 	}
-	fftProc.ForwardSplit(buf[:], out.Re[:], out.Im[:])
+	fft.ForwardSplit(fftProc, buf[:], out.Re[:], out.Im[:])
 }
 
-func paddedFftSqrtHanning(fftProc *fft.OouraFFT, x []float32, xOld []float32, out *FftData) {
+func paddedFftSqrtHanning(fftProc fft.FFT, x []float32, xOld []float32, out *FftData) {
 	var buf [FFTSize]float32
 	for i := 0; i < FFTLengthBy2; i++ {
 		buf[i] = xOld[i] * sqrtHanning[i]
@@ -78,5 +78,5 @@ func paddedFftSqrtHanning(fftProc *fft.OouraFFT, x []float32, xOld []float32, ou
 	for i := 0; i < FFTLengthBy2; i++ {
 		buf[FFTLengthBy2+i] = x[i] * sqrtHanning[FFTLengthBy2+i]
 	}
-	fftProc.ForwardSplit(buf[:], out.Re[:], out.Im[:])
+	fft.ForwardSplit(fftProc, buf[:], out.Re[:], out.Im[:])
 }

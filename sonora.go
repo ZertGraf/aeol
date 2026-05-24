@@ -7,6 +7,7 @@ import (
 
 	"sonora/aec3"
 	agc "sonora/agc2"
+	"sonora/hpf"
 	"sonora/ns"
 )
 
@@ -17,7 +18,7 @@ type AudioProcessing struct {
 	renderConfig  StreamConfig
 	config        Config
 
-	highPassFilters  []*HighPassFilter
+	highPassFilters  []*hpf.Filter
 	noiseSuppressors []*ns.Suppressor
 	gainControllers  []*agc.GainController2
 	echoCancellers   []*aec3.EchoCanceller3
@@ -45,9 +46,9 @@ func newAudioProcessing(captureConfig, renderConfig StreamConfig, config Config)
 	numChannels := int(captureConfig.NumChannels)
 
 	if config.HighPassFilterEnabled() {
-		ap.highPassFilters = make([]*HighPassFilter, numChannels)
+		ap.highPassFilters = make([]*hpf.Filter, numChannels)
 		for ch := 0; ch < numChannels; ch++ {
-			ap.highPassFilters[ch] = NewHighPassFilter(captureConfig.SampleRateHz, 1)
+			ap.highPassFilters[ch] = hpf.New(captureConfig.SampleRateHz)
 		}
 	}
 
@@ -95,7 +96,13 @@ func newAudioProcessing(captureConfig, renderConfig StreamConfig, config Config)
 	return ap, nil
 }
 
-func (ap *AudioProcessing) ProcessCaptureFloat(data [][]float32) error {
+func (ap *AudioProcessing) ProcessCaptureFloatS16(data [][]float32) error {
+	ap.mu.Lock()
+	defer ap.mu.Unlock()
+	return ap.processCaptureFloatLocked(data)
+}
+
+func (ap *AudioProcessing) ProcessCaptureFloatNormalized(data [][]float32) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
 
@@ -156,7 +163,7 @@ func (ap *AudioProcessing) processCaptureFloatLocked(data [][]float32) error {
 	for ch := 0; ch < numChannels; ch++ {
 		chData := data[ch]
 		if len(ap.highPassFilters) > ch && ap.highPassFilters[ch] != nil {
-			ap.highPassFilters[ch].Process([][]float32{chData})
+			ap.highPassFilters[ch].Process(chData)
 		}
 	}
 
@@ -216,7 +223,13 @@ func (ap *AudioProcessing) processCaptureFloatLocked(data [][]float32) error {
 	return nil
 }
 
-func (ap *AudioProcessing) ProcessRenderFloat(data [][]float32) error {
+func (ap *AudioProcessing) ProcessRenderFloatS16(data [][]float32) error {
+	ap.mu.Lock()
+	defer ap.mu.Unlock()
+	return ap.processRenderFloatLocked(data)
+}
+
+func (ap *AudioProcessing) ProcessRenderFloatNormalized(data [][]float32) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
 
@@ -237,6 +250,8 @@ func (ap *AudioProcessing) ProcessRenderFloat(data [][]float32) error {
 	return err
 }
 
+// processRenderFloatLocked feeds render (far-end) audio to echo cancellers.
+// only the first render channel is used — stereo render is not supported.
 func (ap *AudioProcessing) processRenderFloatLocked(data [][]float32) error {
 	if len(data) == 0 || len(data[0]) == 0 {
 		return nil
@@ -315,9 +330,9 @@ func (ap *AudioProcessing) ApplyConfig(config Config) error {
 	numChannels := int(ap.captureConfig.NumChannels)
 
 	if config.HighPassFilterEnabled() && len(ap.highPassFilters) == 0 {
-		ap.highPassFilters = make([]*HighPassFilter, numChannels)
+		ap.highPassFilters = make([]*hpf.Filter, numChannels)
 		for ch := 0; ch < numChannels; ch++ {
-			ap.highPassFilters[ch] = NewHighPassFilter(ap.captureConfig.SampleRateHz, 1)
+			ap.highPassFilters[ch] = hpf.New(ap.captureConfig.SampleRateHz)
 		}
 	} else if !config.HighPassFilterEnabled() {
 		ap.highPassFilters = nil
@@ -331,6 +346,43 @@ func (ap *AudioProcessing) ApplyConfig(config Config) error {
 		}
 	} else {
 		ap.noiseSuppressors = nil
+	}
+
+	if config.GainController2Enabled() && len(ap.gainControllers) == 0 {
+		gc2Config := agc.Config{
+			Enabled: true,
+			AdaptiveDigital: agc.AdaptiveDigitalConfig{
+				Enabled:                  config.GainController2.AdaptiveDigital.Enabled,
+				DryRun:                   config.GainController2.AdaptiveDigital.DryRun,
+				HeadroomDb:               config.GainController2.AdaptiveDigital.HeadroomDb,
+				MaxGainDb:                config.GainController2.AdaptiveDigital.MaxGainDb,
+				InitialGainDb:            config.GainController2.AdaptiveDigital.InitialGainDb,
+				MaxGainChangeDbPerSecond: config.GainController2.AdaptiveDigital.MaxGainChangeDbPerSecond,
+				MaxOutputNoiseLevelDbfs:  config.GainController2.AdaptiveDigital.MaxOutputNoiseLevelDbfs,
+			},
+			FixedDigital: agc.FixedDigitalConfig{
+				GainDb: config.GainController2.FixedDigital.GainDb,
+			},
+		}
+		ap.gainControllers = make([]*agc.GainController2, numChannels)
+		for ch := 0; ch < numChannels; ch++ {
+			ap.gainControllers[ch] = agc.NewGainController2(gc2Config)
+		}
+	} else if !config.GainController2Enabled() {
+		ap.gainControllers = nil
+	}
+
+	if config.EchoCancellerEnabled() && len(ap.echoCancellers) == 0 {
+		ap.echoCancellers = make([]*aec3.EchoCanceller3, numChannels)
+		for ch := 0; ch < numChannels; ch++ {
+			ap.echoCancellers[ch] = aec3.NewEchoCanceller3(
+				aec3.DefaultConfig(),
+				ap.captureConfig.SampleRateHz,
+				1,
+			)
+		}
+	} else if !config.EchoCancellerEnabled() {
+		ap.echoCancellers = nil
 	}
 
 	ap.config = config

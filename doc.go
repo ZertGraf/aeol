@@ -21,7 +21,17 @@
 //	}
 //	defer ap.Close()
 //
-//	// process 10ms frames
-//	ap.ProcessCapture(captureFrame)
-//	ap.ProcessRender(renderFrame)
+//	// process 10ms frames (normalized [-1, 1] float)
+//	ap.ProcessRenderFloatNormalized([][]float32{renderFrame})
+//	ap.ProcessCaptureFloatNormalized([][]float32{captureFrame})
+//
+//	// or int16 interleaved
+//	ap.ProcessRenderInt16(renderSamples)
+//	ap.ProcessCaptureInt16(captureSamples)
+//
+//	// or FloatS16 [-32768, 32767] float
+//	ap.ProcessRenderFloatS16([][]float32{renderFrame})
+//	ap.ProcessCaptureFloatS16([][]float32{captureFrame})
+//
+// Instances are not safe for concurrent use; synchronization is the caller's responsibility.
 package sonora

@@ -9,7 +9,7 @@ import (
 type Suppressor struct {
 	config         Config
 	params         suppressionParams
-	fftProcessor   *fft.FFT4G
+	fftProcessor   fft.FFT
 	noiseEst       *noiseEstimator
 	wiener         *wienerFilter
 	speechProbEst  *speechProbabilityEstimator
@@ -31,11 +31,15 @@ type Suppressor struct {
 	signalSpec  [numFreqBins]float32
 }
 
-func NewSuppressor(cfg Config) *Suppressor {
+func NewSuppressor(cfg Config, fftFactory ...fft.Factory) *Suppressor {
+	factory := fft.DefaultFactory
+	if len(fftFactory) > 0 && fftFactory[0] != nil {
+		factory = fftFactory[0]
+	}
 	s := &Suppressor{
 		config:         cfg,
 		params:         getSuppressionParams(cfg.Level),
-		fftProcessor:   fft.NewFFT4G(fftSize),
+		fftProcessor:   factory(fftSize),
 		noiseEst:       newNoiseEstimator(),
 		wiener:         newWienerFilter(),
 		speechProbEst:  newSpeechProbabilityEstimator(),

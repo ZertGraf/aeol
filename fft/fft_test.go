@@ -38,10 +38,10 @@ func TestOouraSplitRoundtrip(t *testing.T) {
 		original[i] = data[i]
 	}
 
-	o.ForwardSplit(data, re, im)
+	ForwardSplit(o, data, re, im)
 
 	data2 := make([]float32, OouraFFTSize)
-	o.InverseSplit(re, im, data2)
+	InverseSplit(o, re, im, data2)
 
 	for i := range data2 {
 		if math.Abs(float64(data2[i]-original[i])) > 1e-4 {

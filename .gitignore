@@ -1,0 +1,24 @@
+# IDE
+.idea/
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Profiling
+*.prof
+
+# Test coverage
+cover
+cover.out
+coverage.html
+
+# Test artifacts
+test_input/
+test_output*/
+
+# OS
+.DS_Store
+Thumbs.db

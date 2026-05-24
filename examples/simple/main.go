@@ -31,7 +31,7 @@ func main() {
 			renderFrame[i] = 0.5 * float32(math.Sin(2*math.Pi*440*t))
 		}
 
-		if err := ap.ProcessRenderFloat([][]float32{renderFrame}); err != nil {
+		if err := ap.ProcessRenderFloatNormalized([][]float32{renderFrame}); err != nil {
 			panic(err)
 		}
 
@@ -40,7 +40,7 @@ func main() {
 			captureFrame[i] += 0.001 * float32(math.Sin(2*math.Pi*1000*float64(iter*frameSize+i)/48000.0))
 		}
 
-		if err := ap.ProcessCaptureFloat([][]float32{captureFrame}); err != nil {
+		if err := ap.ProcessCaptureFloatNormalized([][]float32{captureFrame}); err != nil {
 			panic(err)
 		}
 	}

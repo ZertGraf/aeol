@@ -55,3 +55,17 @@ func (sc StreamConfig) Validate() error {
 }
 
 var ErrInvalidStreamConfig = errors.New("invalid stream config")
+
+// ToFloatS16 converts normalized [-1, 1] samples to FloatS16 [-32768, 32767] in place.
+func ToFloatS16(samples []float32) {
+	for i := range samples {
+		samples[i] *= 32768.0
+	}
+}
+
+// FromFloatS16 converts FloatS16 [-32768, 32767] samples to normalized [-1, 1] in place.
+func FromFloatS16(samples []float32) {
+	for i := range samples {
+		samples[i] /= 32768.0
+	}
+}

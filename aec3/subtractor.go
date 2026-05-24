@@ -124,7 +124,7 @@ type Subtractor struct {
 	refinedFilter *AdaptiveFilter
 	coarseFilter  *AdaptiveFilter
 	config        FilterConfig
-	fftProcessor  *fft.OouraFFT
+	fftProcessor  fft.FFT
 
 	misadjEstimator       *filterMisadjustmentEstimator
 	poorCoarseFilterCount int
@@ -135,18 +135,22 @@ type Subtractor struct {
 	scratchECoarseFft FftData
 }
 
-func NewSubtractor(config FilterConfig) *Subtractor {
+func NewSubtractor(config FilterConfig, fftFactory ...fft.Factory) *Subtractor {
+	factory := fft.DefaultFactory
+	if len(fftFactory) > 0 && fftFactory[0] != nil {
+		factory = fftFactory[0]
+	}
 	return &Subtractor{
 		refinedFilter:   NewAdaptiveFilter(config.Refined.LengthBlocks),
 		coarseFilter:    NewAdaptiveFilter(config.Coarse.LengthBlocks),
 		config:          config,
-		fftProcessor:    fft.NewOouraFFT(),
+		fftProcessor:    factory(FFTSize),
 		misadjEstimator: newFilterMisadjustmentEstimator(),
 	}
 }
 
-func predictionError(fftProc *fft.OouraFFT, s *FftData, y []float32, e *[BlockSize]float32, sOut *[BlockSize]float32, tmp *[FFTSize]float32) {
-	fftProc.InverseSplit(s.Re[:], s.Im[:], tmp[:])
+func predictionError(fftProc fft.FFT, s *FftData, y []float32, e *[BlockSize]float32, sOut *[BlockSize]float32, tmp *[FFTSize]float32) {
+	fft.InverseSplit(fftProc, s.Re[:], s.Im[:], tmp[:])
 	for k := 0; k < BlockSize; k++ {
 		e[k] = y[k] - tmp[k+FFTLengthBy2]
 	}
@@ -167,7 +171,7 @@ func scaleFilterOutput(y []float32, factor float32, e *[BlockSize]float32, s *[B
 func (sub *Subtractor) Process(renderBuffer *RenderBuffer, captureFft *FftData, renderPower float32, output *SubtractorOutput) {
 	var y [BlockSize]float32
 	var iFftBuf [FFTSize]float32
-	sub.fftProcessor.InverseSplit(captureFft.Re[:], captureFft.Im[:], iFftBuf[:])
+	fft.InverseSplit(sub.fftProcessor, captureFft.Re[:], captureFft.Im[:], iFftBuf[:])
 	for k := 0; k < BlockSize; k++ {
 		y[k] = iFftBuf[k+FFTLengthBy2]
 	}

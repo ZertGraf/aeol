@@ -5,16 +5,20 @@ import (
 )
 
 type SuppressionFilter struct {
-	fftProcessor     *fft.OouraFFT
+	fftProcessor     fft.FFT
 	eOutputOld       [FFTLengthBy2]float32
 	scratchNoiseGain [FFTSizeBy2Plus1]float32
 	scratchEFreq     FftData
 	scratchBuf       [FFTSize]float32
 }
 
-func NewSuppressionFilter() *SuppressionFilter {
+func NewSuppressionFilter(fftFactory ...fft.Factory) *SuppressionFilter {
+	factory := fft.DefaultFactory
+	if len(fftFactory) > 0 && fftFactory[0] != nil {
+		factory = fftFactory[0]
+	}
 	return &SuppressionFilter{
-		fftProcessor: fft.NewOouraFFT(),
+		fftProcessor: factory(FFTSize),
 	}
 }
 
@@ -50,7 +54,7 @@ func (sf *SuppressionFilter) ApplyGain(
 		sf.scratchEFreq.Im[k] = eImag
 	}
 
-	sf.fftProcessor.InverseSplit(sf.scratchEFreq.Re[:], sf.scratchEFreq.Im[:], sf.scratchBuf[:])
+	fft.InverseSplit(sf.fftProcessor, sf.scratchEFreq.Re[:], sf.scratchEFreq.Im[:], sf.scratchBuf[:])
 
 	for i := 0; i < FFTLengthBy2; i++ {
 		v := sf.eOutputOld[i]*sqrtHanning[FFTLengthBy2+i] +

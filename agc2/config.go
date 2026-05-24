@@ -1,6 +1,13 @@
 // Package agc2 implements Automatic Gain Control (AGC2) based on WebRTC's
 // AGC2 algorithm. It provides adaptive digital gain control with speech
 // level estimation, noise floor tracking, and output limiting.
+//
+// AGC2 operates on full-band audio (no band splitting needed).
+// It accepts 10ms frames at any supported sample rate.
+//
+// All samples are in FloatS16 format (float32 in [-32768, 32767]).
+//
+// Instances are not safe for concurrent use; synchronization is the caller's responsibility.
 package agc2
 
 import "math"

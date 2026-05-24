@@ -2,6 +2,13 @@
 // based on WebRTC's AEC3 algorithm. It processes audio in 64-sample
 // blocks using frequency-domain adaptive filtering to remove echo
 // from the capture signal.
+//
+// Like ns, AEC3 operates on the 0-8kHz band only (16kHz internal rate).
+// For higher sample rates, the caller must band-split first.
+//
+// All samples are in FloatS16 format (float32 in [-32768, 32767]).
+//
+// Instances are not safe for concurrent use; synchronization is the caller's responsibility.
 package aec3
 
 const (

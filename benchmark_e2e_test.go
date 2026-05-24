@@ -311,10 +311,10 @@ func runStageTiming(t *testing.T, sampleRate uint32) {
 	for i := 0; i < warmupFrames; i++ {
 		r := make([]float32, frameSize)
 		copy(r, renders[i])
-		apFull.ProcessRenderFloat([][]float32{r})
+		apFull.ProcessRenderFloatNormalized([][]float32{r})
 		c := make([]float32, frameSize)
 		copy(c, captures[i])
-		apFull.ProcessCaptureFloat([][]float32{c})
+		apFull.ProcessCaptureFloatNormalized([][]float32{c})
 	}
 
 	tRender := &stageTiming{name: "FULL-RENDER"}
@@ -336,14 +336,14 @@ func runStageTiming(t *testing.T, sampleRate uint32) {
 		// render only
 		start := time.Now()
 		for j := 0; j < batchSize; j++ {
-			apFull.ProcessRenderFloat([][]float32{rs[j]})
+			apFull.ProcessRenderFloatNormalized([][]float32{rs[j]})
 		}
 		tRender.record(time.Since(start), batchSize)
 
 		// capture only
 		start = time.Now()
 		for j := 0; j < batchSize; j++ {
-			apFull.ProcessCaptureFloat([][]float32{cs[j]})
+			apFull.ProcessCaptureFloatNormalized([][]float32{cs[j]})
 		}
 		tCapture.record(time.Since(start), batchSize)
 
@@ -354,8 +354,8 @@ func runStageTiming(t *testing.T, sampleRate uint32) {
 		}
 		start = time.Now()
 		for j := 0; j < batchSize; j++ {
-			apFull.ProcessRenderFloat([][]float32{rs[j]})
-			apFull.ProcessCaptureFloat([][]float32{cs[j]})
+			apFull.ProcessRenderFloatNormalized([][]float32{rs[j]})
+			apFull.ProcessCaptureFloatNormalized([][]float32{cs[j]})
 		}
 		tPipeline.record(time.Since(start), batchSize)
 	}
@@ -408,8 +408,8 @@ func TestE2E_MultiChannel(t *testing.T) {
 			r[ch] = sineFrame(frameSize, 300+float64(ch)*200, float64(sampleRate), 0.3)
 			c[ch] = echoFrame(r[ch], 0.4, 0.02)
 		}
-		ap.ProcessRenderFloat(r)
-		ap.ProcessCaptureFloat(c)
+		ap.ProcessRenderFloatNormalized(r)
+		ap.ProcessCaptureFloatNormalized(c)
 	}
 
 	tR := &stageTiming{name: "render-2ch"}
@@ -431,13 +431,13 @@ func TestE2E_MultiChannel(t *testing.T) {
 
 		start := time.Now()
 		for j := 0; j < batchSize; j++ {
-			ap.ProcessRenderFloat(rBatch[j])
+			ap.ProcessRenderFloatNormalized(rBatch[j])
 		}
 		tR.record(time.Since(start), batchSize)
 
 		start = time.Now()
 		for j := 0; j < batchSize; j++ {
-			ap.ProcessCaptureFloat(cBatch[j])
+			ap.ProcessCaptureFloatNormalized(cBatch[j])
 		}
 		tC.record(time.Since(start), batchSize)
 	}
@@ -601,7 +601,7 @@ func TestE2E_Int16VsFloat32(t *testing.T) {
 		f := sineFrame(frameSize, 440, float64(sampleRate), 0.3)
 		fCopy := make([]float32, frameSize)
 		copy(fCopy, f)
-		apF.ProcessCaptureFloat([][]float32{fCopy})
+		apF.ProcessCaptureFloatNormalized([][]float32{fCopy})
 		buf := make([]int16, frameSize)
 		for j := range buf {
 			buf[j] = int16(f[j] * math.MaxInt16)
@@ -625,7 +625,7 @@ func TestE2E_Int16VsFloat32(t *testing.T) {
 
 		start := time.Now()
 		for j := 0; j < batchSize; j++ {
-			apF.ProcessCaptureFloat([][]float32{fFrames[j]})
+			apF.ProcessCaptureFloatNormalized([][]float32{fFrames[j]})
 		}
 		tF.record(time.Since(start), batchSize)
 
@@ -694,9 +694,9 @@ func TestE2E_Throughput(t *testing.T) {
 				c[ch] = echoFrame(r[ch], 0.4, 0.02)
 			}
 			if cfg.aec {
-				ap.ProcessRenderFloat(r)
+				ap.ProcessRenderFloatNormalized(r)
 			}
-			ap.ProcessCaptureFloat(c)
+			ap.ProcessCaptureFloatNormalized(c)
 		}
 
 		n := 3000
@@ -709,9 +709,9 @@ func TestE2E_Throughput(t *testing.T) {
 				c[ch] = echoFrame(r[ch], 0.4, 0.02)
 			}
 			if cfg.aec {
-				ap.ProcessRenderFloat(r)
+				ap.ProcessRenderFloatNormalized(r)
 			}
-			ap.ProcessCaptureFloat(c)
+			ap.ProcessCaptureFloatNormalized(c)
 		}
 		elapsed := time.Since(start)
 		ap.Close()
@@ -901,13 +901,13 @@ func BenchmarkPipeline_Full_16k(b *testing.B) {
 	cData := [][]float32{capture}
 
 	for i := 0; i < warmupFrames; i++ {
-		ap.ProcessRenderFloat(rData)
-		ap.ProcessCaptureFloat(cData)
+		ap.ProcessRenderFloatNormalized(rData)
+		ap.ProcessCaptureFloatNormalized(cData)
 	}
 	b.ResetTimer()
 	for range b.N {
-		ap.ProcessRenderFloat(rData)
-		ap.ProcessCaptureFloat(cData)
+		ap.ProcessRenderFloatNormalized(rData)
+		ap.ProcessCaptureFloatNormalized(cData)
 	}
 }
 
@@ -926,13 +926,13 @@ func BenchmarkPipeline_Full_48k(b *testing.B) {
 	cData := [][]float32{capture}
 
 	for i := 0; i < warmupFrames; i++ {
-		ap.ProcessRenderFloat(rData)
-		ap.ProcessCaptureFloat(cData)
+		ap.ProcessRenderFloatNormalized(rData)
+		ap.ProcessCaptureFloatNormalized(cData)
 	}
 	b.ResetTimer()
 	for range b.N {
-		ap.ProcessRenderFloat(rData)
-		ap.ProcessCaptureFloat(cData)
+		ap.ProcessRenderFloatNormalized(rData)
+		ap.ProcessCaptureFloatNormalized(cData)
 	}
 }
 
@@ -953,13 +953,13 @@ func BenchmarkPipeline_Full_48k_2ch(b *testing.B) {
 	cData := [][]float32{c0, c1}
 
 	for i := 0; i < warmupFrames; i++ {
-		ap.ProcessRenderFloat(rData)
-		ap.ProcessCaptureFloat(cData)
+		ap.ProcessRenderFloatNormalized(rData)
+		ap.ProcessCaptureFloatNormalized(cData)
 	}
 	b.ResetTimer()
 	for range b.N {
-		ap.ProcessRenderFloat(rData)
-		ap.ProcessCaptureFloat(cData)
+		ap.ProcessRenderFloatNormalized(rData)
+		ap.ProcessCaptureFloatNormalized(cData)
 	}
 }
 
@@ -972,11 +972,11 @@ func BenchmarkPipeline_NSOnly_16k(b *testing.B) {
 	frame := noiseFrame(160, 0.05)
 	data := [][]float32{frame}
 	for i := 0; i < warmupFrames; i++ {
-		ap.ProcessCaptureFloat(data)
+		ap.ProcessCaptureFloatNormalized(data)
 	}
 	b.ResetTimer()
 	for range b.N {
-		ap.ProcessCaptureFloat(data)
+		ap.ProcessCaptureFloatNormalized(data)
 	}
 }
 
@@ -992,12 +992,12 @@ func BenchmarkPipeline_AECOnly_16k(b *testing.B) {
 	cData := [][]float32{capture}
 
 	for i := 0; i < warmupFrames; i++ {
-		ap.ProcessRenderFloat(rData)
-		ap.ProcessCaptureFloat(cData)
+		ap.ProcessRenderFloatNormalized(rData)
+		ap.ProcessCaptureFloatNormalized(cData)
 	}
 	b.ResetTimer()
 	for range b.N {
-		ap.ProcessRenderFloat(rData)
-		ap.ProcessCaptureFloat(cData)
+		ap.ProcessRenderFloatNormalized(rData)
+		ap.ProcessCaptureFloatNormalized(cData)
 	}
 }
