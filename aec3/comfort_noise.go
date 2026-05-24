@@ -23,6 +23,8 @@ var sqrt2Sin = [32]float32{
 	-1.4142135, -1.3870398, -1.3065630, -1.1758756, -1.0000000, -0.7856950, -0.5411961, -0.2758994,
 }
 
+// ComfortNoiseGenerator estimates background noise power per frequency bin and
+// synthesizes spectrally shaped pseudo-random noise for comfort noise injection.
 type ComfortNoiseGenerator struct {
 	seed       uint32
 	noiseFloor float32
@@ -34,6 +36,7 @@ type ComfortNoiseGenerator struct {
 	scratchN   [FFTSizeBy2Plus1]float32
 }
 
+// NewComfortNoiseGenerator creates a ComfortNoiseGenerator with a default noise floor of -50 dBFS.
 func NewComfortNoiseGenerator() *ComfortNoiseGenerator {
 	cng := &ComfortNoiseGenerator{
 		seed:       42,
@@ -52,6 +55,9 @@ func getNoiseFloorFactor(noiseFloorDbfs float32) float32 {
 	return 64 * float32(math.Pow(10, float64((dbfsNormalization+noiseFloorDbfs)*0.1)))
 }
 
+// Compute updates the noise estimate from captureSpectrum and writes shaped comfort noise
+// into out as a half-spectrum (FFTSizeBy2Plus1 complex bins).
+// set saturated to true to freeze the noise tracker during clipping events.
 func (cng *ComfortNoiseGenerator) Compute(saturated bool, captureSpectrum [FFTSizeBy2Plus1]float32, out *FftData) {
 	if !saturated {
 		for k := 0; k < FFTSizeBy2Plus1; k++ {
@@ -120,6 +126,8 @@ func (cng *ComfortNoiseGenerator) Compute(saturated bool, captureSpectrum [FFTSi
 	}
 }
 
+// NoiseSpectrum returns a pointer to the current per-bin noise power estimate array.
+// the array has FFTSizeBy2Plus1 (65) elements in FloatS16^2 units.
 func (cng *ComfortNoiseGenerator) NoiseSpectrum() *[FFTSizeBy2Plus1]float32 {
 	return &cng.n2
 }

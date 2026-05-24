@@ -2,6 +2,9 @@ package agc2
 
 import "math"
 
+// AdaptiveDigitalGainController tracks speech and noise levels via exponential estimators
+// and computes a target gain to bring speech toward -18 dBFS. gain changes are
+// rate-limited per MaxGainChangeDbPerSecond and a hard limiter clips at FloatS16 bounds.
 type AdaptiveDigitalGainController struct {
 	config            AdaptiveDigitalConfig
 	gainApplier       *gainApplier
@@ -13,6 +16,8 @@ type AdaptiveDigitalGainController struct {
 	currentGainDb     float32
 }
 
+// NewAdaptiveDigitalGainController creates the adaptive gain stage with the given config.
+// InitialGainDb sets the starting gain before any speech has been observed.
 func NewAdaptiveDigitalGainController(config AdaptiveDigitalConfig) *AdaptiveDigitalGainController {
 	return &AdaptiveDigitalGainController{
 		config:          config,
@@ -26,6 +31,9 @@ func NewAdaptiveDigitalGainController(config AdaptiveDigitalConfig) *AdaptiveDig
 	}
 }
 
+// Process applies adaptive gain to samples in-place. samples must be in FloatS16 format.
+// runs VAD, updates speech/noise estimators, clamps gain to configured limits, then applies
+// a ramped gain and hard limiter. no-op when DryRun is set.
 func (c *AdaptiveDigitalGainController) Process(samples []float32) {
 	speechProb := c.vad.Analyze(samples)
 	rms := computeRms(samples)
@@ -79,10 +87,12 @@ func (c *AdaptiveDigitalGainController) computeTargetGain() float32 {
 	return float32(math.Max(float64(desiredGain), float64(minGainDb)))
 }
 
+// GainDb returns the current adaptive gain in dB as of the last Process call.
 func (c *AdaptiveDigitalGainController) GainDb() float32 {
 	return c.currentGainDb
 }
 
+// Reset returns the controller to its initial state, discarding all learned speech and noise levels.
 func (c *AdaptiveDigitalGainController) Reset() {
 	c.currentGainDb = c.config.InitialGainDb
 	c.gainApplier = newGainApplier(c.config.InitialGainDb)
@@ -93,12 +103,17 @@ func (c *AdaptiveDigitalGainController) Reset() {
 	c.limiterInst.Reset()
 }
 
+// GainController2 is the top-level AGC2 processor. it applies a fixed linear gain
+// first, then an optional adaptive gain stage. operates in-place on FloatS16 frames of any size.
 type GainController2 struct {
 	config     Config
 	adaptive   *AdaptiveDigitalGainController
 	fixedGain  float32
 }
 
+// NewGainController2 creates a GainController2 from the given config.
+// FixedDigital.GainDb of 0 means unity (no fixed gain). set AdaptiveDigital.Enabled to
+// activate the adaptive stage; otherwise only the fixed gain is applied.
 func NewGainController2(config Config) *GainController2 {
 	gc := &GainController2{
 		config:    config,
@@ -110,6 +125,8 @@ func NewGainController2(config Config) *GainController2 {
 	return gc
 }
 
+// Process applies gain to samples in-place. samples must be in FloatS16 format (float32 in [-32768, 32767]).
+// fixed gain is applied first as a scalar multiply, then the adaptive stage runs if enabled.
 func (gc *GainController2) Process(samples []float32) {
 	if gc.fixedGain != 1.0 {
 		for i := range samples {
@@ -122,6 +139,7 @@ func (gc *GainController2) Process(samples []float32) {
 	}
 }
 
+// Reset clears all adaptive state. fixed gain is unaffected.
 func (gc *GainController2) Reset() {
 	if gc.adaptive != nil {
 		gc.adaptive.Reset()

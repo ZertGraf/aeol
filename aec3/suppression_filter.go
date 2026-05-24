@@ -4,6 +4,9 @@ import (
 	"sonora/fft"
 )
 
+// SuppressionFilter applies frequency-domain Wiener-like gain to the error signal
+// and blends in comfort noise, then reconstructs the time-domain output via
+// inverse FFT and overlap-add with a sqrt-Hanning window.
 type SuppressionFilter struct {
 	fftProcessor     fft.FFT
 	eOutputOld       [FFTLengthBy2]float32
@@ -12,6 +15,8 @@ type SuppressionFilter struct {
 	scratchBuf       [FFTSize]float32
 }
 
+// NewSuppressionFilter creates a SuppressionFilter.
+// fftFactory is optional; if omitted the default Ooura FFT backend is used.
 func NewSuppressionFilter(fftFactory ...fft.Factory) *SuppressionFilter {
 	factory := fft.DefaultFactory
 	if len(fftFactory) > 0 && fftFactory[0] != nil {
@@ -22,6 +27,10 @@ func NewSuppressionFilter(fftFactory ...fft.Factory) *SuppressionFilter {
 	}
 }
 
+// ApplyGain multiplies each frequency bin of eFft by suppressionGain, adds comfort noise
+// scaled by the complementary gain sqrt(1 - g^2), then reconstructs BlockSize FloatS16
+// samples into output via IFFT and overlap-add.
+// comfortNoise may be nil to skip noise injection.
 func (sf *SuppressionFilter) ApplyGain(
 	comfortNoise *FftData,
 	suppressionGain [FFTSizeBy2Plus1]float32,
@@ -70,6 +79,7 @@ func (sf *SuppressionFilter) ApplyGain(
 	copy(sf.eOutputOld[:], sf.scratchBuf[FFTLengthBy2:])
 }
 
+// Reset clears the overlap-add tail buffer, eliminating any residual output from prior frames.
 func (sf *SuppressionFilter) Reset() {
 	clear(sf.eOutputOld[:])
 }

@@ -1,30 +1,45 @@
 package sonora
 
+// NsLevel controls the aggressiveness of the noise suppressor.
+// higher values remove more noise but may also suppress speech.
 type NsLevel int
 
 const (
-	NsLevelLow      NsLevel = 0
+	// NsLevelLow applies minimal noise suppression, preserving more of the original signal.
+	NsLevelLow NsLevel = 0
+	// NsLevelModerate applies a balanced amount of suppression suitable for most environments.
 	NsLevelModerate NsLevel = 1
-	NsLevelHigh     NsLevel = 2
+	// NsLevelHigh aggressively suppresses noise; may reduce speech quality in clean conditions.
+	NsLevelHigh NsLevel = 2
+	// NsLevelVeryHigh applies maximum suppression; use only in very noisy environments.
 	NsLevelVeryHigh NsLevel = 3
 )
 
+// HighPassFilterConfig configures the high-pass filter applied to the capture signal.
+// the filter removes low-frequency rumble and DC offset below roughly 80 Hz.
 type HighPassFilterConfig struct {
+	// ApplyInFullBand applies the filter to the full-band signal rather than just the lowest sub-band.
 	ApplyInFullBand bool
 }
 
+// DefaultHighPassFilterConfig returns a HighPassFilterConfig with full-band filtering enabled.
 func DefaultHighPassFilterConfig() HighPassFilterConfig {
 	return HighPassFilterConfig{ApplyInFullBand: true}
 }
 
+// PreAmplifierConfig applies a linear gain to the capture signal before any other processing.
+// Gain is a linear multiplier; 1.0 means no change, 2.0 doubles amplitude.
 type PreAmplifierConfig struct {
 	Gain float32
 }
 
+// DefaultPreAmplifierConfig returns a PreAmplifierConfig with unity gain (no amplification).
 func DefaultPreAmplifierConfig() PreAmplifierConfig {
 	return PreAmplifierConfig{Gain: 1.0}
 }
 
+// CaptureLevelAdjustmentConfig applies dB gain before and after the main processing chain.
+// PreGainDb is applied before AEC/NS, PostGainDb is applied after AGC2.
 type CaptureLevelAdjustmentConfig struct {
 	Enabled      bool
 	PreGainDb    float32
@@ -32,6 +47,8 @@ type CaptureLevelAdjustmentConfig struct {
 	AnalogMicGainEmulation AnalogMicGainEmulationConfig
 }
 
+// AnalogMicGainEmulationConfig emulates the behavior of an analog microphone gain control.
+// levels are hardware-style integers in [MinLevel, MaxLevel]; InitLevel sets the starting point.
 type AnalogMicGainEmulationConfig struct {
 	Enabled    bool
 	InitLevel  int
@@ -39,6 +56,7 @@ type AnalogMicGainEmulationConfig struct {
 	MaxLevel   int
 }
 
+// DefaultCaptureLevelAdjustmentConfig returns a CaptureLevelAdjustmentConfig with all adjustments disabled.
 func DefaultCaptureLevelAdjustmentConfig() CaptureLevelAdjustmentConfig {
 	return CaptureLevelAdjustmentConfig{
 		Enabled:    false,
@@ -53,22 +71,30 @@ func DefaultCaptureLevelAdjustmentConfig() CaptureLevelAdjustmentConfig {
 	}
 }
 
+// EchoCancellerConfig configures the AEC3 acoustic echo canceller.
 type EchoCancellerConfig struct {
+	// EnforceHighPassFiltering applies an internal high-pass filter inside AEC3 regardless of HighPassFilterConfig.
 	EnforceHighPassFiltering bool
 }
 
+// DefaultEchoCancellerConfig returns an EchoCancellerConfig with high-pass filtering enforced.
 func DefaultEchoCancellerConfig() EchoCancellerConfig {
 	return EchoCancellerConfig{EnforceHighPassFiltering: true}
 }
 
+// NsConfig configures the noise suppressor.
 type NsConfig struct {
+	// Level sets the suppression aggressiveness; see NsLevel constants.
 	Level NsLevel
 }
 
+// DefaultNsConfig returns a NsConfig at moderate suppression level.
 func DefaultNsConfig() NsConfig {
 	return NsConfig{Level: NsLevelModerate}
 }
 
+// GainController2Config configures AGC2, which normalizes the output level after NS.
+// set Enabled to true to activate; the controller is skipped when Enabled is false.
 type GainController2Config struct {
 	Enabled              bool
 	AdaptiveDigital      AdaptiveDigitalConfig
@@ -76,6 +102,11 @@ type GainController2Config struct {
 	InputVolumeControl   InputVolumeControlConfig
 }
 
+// AdaptiveDigitalConfig tunes the adaptive digital gain stage within AGC2.
+// HeadroomDb reserves dB of headroom below 0 dBFS to prevent clipping.
+// MaxGainDb caps the total gain applied to the signal.
+// MaxGainChangeDbPerSecond limits how fast the gain ramps up or down.
+// MaxOutputNoiseLevelDbfs suppresses gain increases when noise floor exceeds this threshold.
 type AdaptiveDigitalConfig struct {
 	Enabled       bool
 	DryRun        bool
@@ -86,14 +117,19 @@ type AdaptiveDigitalConfig struct {
 	MaxOutputNoiseLevelDbfs  float32
 }
 
+// FixedDigitalConfig applies a constant dB gain after the adaptive stage.
+// GainDb of 0 means no additional gain.
 type FixedDigitalConfig struct {
 	GainDb float32
 }
 
+// InputVolumeControlConfig enables optional input volume control within AGC2.
 type InputVolumeControlConfig struct {
 	Enabled bool
 }
 
+// DefaultGainController2Config returns a GainController2Config with adaptive digital gain enabled
+// and conservative defaults suitable for most microphone inputs.
 func DefaultGainController2Config() GainController2Config {
 	return GainController2Config{
 		Enabled: false,
@@ -111,12 +147,16 @@ func DefaultGainController2Config() GainController2Config {
 	}
 }
 
+// PipelineConfig controls internal routing and multi-channel behavior of the pipeline.
+// MaximumInternalProcessingRate caps the rate at which processing stages run internally;
+// AEC3 and NS always operate at 16 kHz regardless of this value.
 type PipelineConfig struct {
 	MaximumInternalProcessingRate uint32
 	MultiChannelRender           bool
 	MultiChannelCapture          bool
 }
 
+// DefaultPipelineConfig returns a PipelineConfig capped at 48 kHz with multi-channel disabled.
 func DefaultPipelineConfig() PipelineConfig {
 	return PipelineConfig{
 		MaximumInternalProcessingRate: SampleRate48kHz,
@@ -125,6 +165,8 @@ func DefaultPipelineConfig() PipelineConfig {
 	}
 }
 
+// Config is the top-level configuration for an AudioProcessing instance.
+// each field is a pointer; a nil pointer disables the corresponding stage entirely.
 type Config struct {
 	Pipeline              *PipelineConfig
 	PreAmplifier          *PreAmplifierConfig
@@ -135,30 +177,38 @@ type Config struct {
 	GainController2       *GainController2Config
 }
 
+// DefaultConfig returns an empty Config with all processing stages disabled.
 func DefaultConfig() Config {
 	return Config{}
 }
 
+// EchoCancellerEnabled reports whether the echo canceller stage is configured.
 func (c Config) EchoCancellerEnabled() bool {
 	return c.EchoCanceller != nil
 }
 
+// NoiseSuppressionEnabled reports whether the noise suppression stage is configured.
 func (c Config) NoiseSuppressionEnabled() bool {
 	return c.NoiseSuppression != nil
 }
 
+// GainController2Enabled reports whether AGC2 is configured and explicitly enabled.
 func (c Config) GainController2Enabled() bool {
 	return c.GainController2 != nil && c.GainController2.Enabled
 }
 
+// HighPassFilterEnabled reports whether the high-pass filter stage is configured.
 func (c Config) HighPassFilterEnabled() bool {
 	return c.HighPassFilter != nil
 }
 
+// PreAmplifierEnabled reports whether the pre-amplifier stage is configured.
 func (c Config) PreAmplifierEnabled() bool {
 	return c.PreAmplifier != nil
 }
 
+// NeedsRender reports whether the current config requires render (far-end) audio to be provided.
+// render audio must be submitted via ProcessRender* before the corresponding capture frame.
 func (c Config) NeedsRender() bool {
 	return c.EchoCancellerEnabled()
 }

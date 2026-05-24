@@ -11,6 +11,10 @@ import (
 	"sonora/ns"
 )
 
+// AudioProcessing is the main entry point for the audio processing pipeline.
+// it combines high-pass filtering, echo cancellation (AEC3), noise suppression (NS),
+// and automatic gain control (AGC2) into a single, configurable processor.
+// all methods are safe for concurrent use; an internal mutex serializes access.
 type AudioProcessing struct {
 	mu sync.Mutex
 
@@ -96,12 +100,18 @@ func newAudioProcessing(captureConfig, renderConfig StreamConfig, config Config)
 	return ap, nil
 }
 
+// ProcessCaptureFloatS16 runs the capture pipeline on de-interleaved FloatS16 samples.
+// data[ch] must contain exactly FrameSize() samples in the range [-32768, 32767].
+// the slice is modified in place; the caller reads processed audio from the same slice after return.
 func (ap *AudioProcessing) ProcessCaptureFloatS16(data [][]float32) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
 	return ap.processCaptureFloatLocked(data)
 }
 
+// ProcessCaptureFloatNormalized runs the capture pipeline on de-interleaved normalized samples.
+// data[ch] must contain exactly FrameSize() samples in the range [-1, 1].
+// samples are scaled to FloatS16 internally and converted back before returning.
 func (ap *AudioProcessing) ProcessCaptureFloatNormalized(data [][]float32) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
@@ -223,12 +233,18 @@ func (ap *AudioProcessing) processCaptureFloatLocked(data [][]float32) error {
 	return nil
 }
 
+// ProcessRenderFloatS16 feeds far-end (speaker) audio to the echo canceller in FloatS16 format.
+// data[ch] must contain exactly FrameSize() samples in the range [-32768, 32767].
+// must be called before the corresponding ProcessCaptureFloatS16 call when AEC is enabled.
 func (ap *AudioProcessing) ProcessRenderFloatS16(data [][]float32) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
 	return ap.processRenderFloatLocked(data)
 }
 
+// ProcessRenderFloatNormalized feeds far-end (speaker) audio to the echo canceller in normalized format.
+// data[ch] must contain exactly FrameSize() samples in the range [-1, 1].
+// must be called before the corresponding ProcessCaptureFloatNormalized call when AEC is enabled.
 func (ap *AudioProcessing) ProcessRenderFloatNormalized(data [][]float32) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
@@ -280,6 +296,9 @@ func (ap *AudioProcessing) processRenderFloatLocked(data [][]float32) error {
 	return nil
 }
 
+// ProcessCaptureInt16 runs the capture pipeline on an interleaved int16 frame.
+// interleaved must contain exactly TotalSamples() elements in channel-interleaved order.
+// samples are converted to FloatS16 internally and written back to the same slice.
 func (ap *AudioProcessing) ProcessCaptureInt16(interleaved []int16) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
@@ -304,6 +323,9 @@ func (ap *AudioProcessing) ProcessCaptureInt16(interleaved []int16) error {
 	return nil
 }
 
+// ProcessRenderInt16 feeds far-end (speaker) audio to the echo canceller as interleaved int16.
+// interleaved must contain exactly TotalSamples() elements using the render stream layout.
+// must be called before the corresponding ProcessCaptureInt16 call when AEC is enabled.
 func (ap *AudioProcessing) ProcessRenderInt16(interleaved []int16) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
@@ -323,6 +345,9 @@ func (ap *AudioProcessing) ProcessRenderInt16(interleaved []int16) error {
 	return ap.processRenderFloatLocked(channels)
 }
 
+// ApplyConfig replaces the active processing configuration at runtime.
+// stages that are newly enabled are initialized fresh; stages that are disabled are torn down.
+// does not reset the internal state of stages that remain enabled across calls.
 func (ap *AudioProcessing) ApplyConfig(config Config) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
@@ -389,12 +414,16 @@ func (ap *AudioProcessing) ApplyConfig(config Config) error {
 	return nil
 }
 
+// Config returns a snapshot of the current processing configuration.
 func (ap *AudioProcessing) Config() Config {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
 	return ap.config
 }
 
+// SetStreamDelayMs informs the echo canceller of the end-to-end render-to-capture delay in milliseconds.
+// values outside [0, 500] are clamped to that range.
+// accurate delay estimation improves echo cancellation quality significantly.
 func (ap *AudioProcessing) SetStreamDelayMs(delayMs int) {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
@@ -407,12 +436,16 @@ func (ap *AudioProcessing) SetStreamDelayMs(delayMs int) {
 	ap.streamDelayMs = delayMs
 }
 
+// Statistics returns a snapshot of the most recently computed processing metrics.
+// pointer fields in AudioProcessingStats are nil when the corresponding stage is not active.
 func (ap *AudioProcessing) Statistics() AudioProcessingStats {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
 	return ap.stats
 }
 
+// Close releases all processing stage resources and renders the instance inoperable.
+// subsequent calls to any Process* method will operate with no active stages.
 func (ap *AudioProcessing) Close() {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()

@@ -52,7 +52,9 @@ func InverseSplit(f FFT, rIn, iIn []float32, data []float32) {
 }
 
 const (
+	// OouraFFTSize is the default FFT size used by AEC3 (128 points).
 	OouraFFTSize = 128
+	// OouraFFTHalf is the number of unique complex bins for a 128-point real FFT (64).
 	OouraFFTHalf = OouraFFTSize / 2
 )
 
@@ -65,7 +67,9 @@ type ooura struct {
 	tmpIm  []float32
 }
 
-// NewOoura creates a pure Go FFT of the given size (must be power of 2, >= 4).
+// NewOoura creates a pure Go radix-2 DIT FFT of the given size (must be a power of 2, >= 4).
+// twiddle factors and bit-reversal table are precomputed at construction time.
+// forward and inverse operations use the packed format described in the FFT interface.
 func NewOoura(size int) *ooura {
 	if size < 4 || size&(size-1) != 0 {
 		panic("fft: size must be a power of 2 >= 4")

@@ -1,10 +1,13 @@
 package aec3
 
+// AdaptiveFilter is a frequency-domain NLMS filter that models the echo path.
+// coefficients are stored as complex spectra, one FftData per filter block.
 type AdaptiveFilter struct {
 	filterLength int
 	coeffs       []FftData
 }
 
+// NewAdaptiveFilter allocates an AdaptiveFilter with lengthBlocks complex-spectrum coefficient blocks.
 func NewAdaptiveFilter(lengthBlocks int) *AdaptiveFilter {
 	return &AdaptiveFilter{
 		filterLength: lengthBlocks,
@@ -12,6 +15,8 @@ func NewAdaptiveFilter(lengthBlocks int) *AdaptiveFilter {
 	}
 }
 
+// Filter computes the frequency-domain echo estimate by convolving the filter coefficients
+// with the render spectra from renderBuffer, writing the result into output.
 func (af *AdaptiveFilter) Filter(renderBuffer *RenderBuffer, output *FftData) {
 	output.Clear()
 	outRe := &output.Re
@@ -26,6 +31,8 @@ func (af *AdaptiveFilter) Filter(renderBuffer *RenderBuffer, output *FftData) {
 	}
 }
 
+// Adapt updates the filter coefficients using the NLMS gradient step:
+// coeffs += stepSize * conj(render) * error, applied per frequency bin.
 func (af *AdaptiveFilter) Adapt(renderBuffer *RenderBuffer, errSignal *FftData, stepSize float32) {
 	eRe := &errSignal.Re
 	eIm := &errSignal.Im
@@ -43,6 +50,8 @@ func (af *AdaptiveFilter) Adapt(renderBuffer *RenderBuffer, errSignal *FftData, 
 	}
 }
 
+// Energy returns the sum of squared magnitudes across all coefficient bins.
+// useful for detecting filter divergence.
 func (af *AdaptiveFilter) Energy() float32 {
 	var energy float32
 	for i := range af.coeffs {
@@ -54,6 +63,8 @@ func (af *AdaptiveFilter) Energy() float32 {
 	return energy
 }
 
+// ScaleFilter multiplies all coefficient bins by scale.
+// used for misadjustment correction when the refined filter diverges.
 func (af *AdaptiveFilter) ScaleFilter(scale float32) {
 	for i := range af.coeffs {
 		c := &af.coeffs[i]
@@ -64,6 +75,8 @@ func (af *AdaptiveFilter) ScaleFilter(scale float32) {
 	}
 }
 
+// CopyFrom copies coefficient blocks from other into af.
+// if lengths differ, the shorter is used and remaining blocks in af are cleared.
 func (af *AdaptiveFilter) CopyFrom(other *AdaptiveFilter) {
 	n := af.filterLength
 	if other.filterLength < n {
@@ -77,6 +90,7 @@ func (af *AdaptiveFilter) CopyFrom(other *AdaptiveFilter) {
 	}
 }
 
+// Reset clears all filter coefficients to zero.
 func (af *AdaptiveFilter) Reset() {
 	for i := range af.coeffs {
 		af.coeffs[i].Clear()

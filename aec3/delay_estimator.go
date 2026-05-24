@@ -2,6 +2,8 @@ package aec3
 
 import "math"
 
+// DelayEstimator estimates the echo-path delay in blocks using cross-correlation
+// of down-sampled render and capture signals over a rolling history window.
 type DelayEstimator struct {
 	downSamplingFactor int
 	numLags            int
@@ -14,6 +16,8 @@ type DelayEstimator struct {
 	estimatedDelay     int
 }
 
+// NewDelayEstimator creates a DelayEstimator sized according to config.
+// the internal history buffer is rounded to the next power of two for efficient masking.
 func NewDelayEstimator(config DelayConfig) *DelayEstimator {
 	maxDelay := config.NumFilters * BlockSize / config.DownSamplingFactor
 	minLen := maxDelay + BlockSize/config.DownSamplingFactor
@@ -30,6 +34,8 @@ func NewDelayEstimator(config DelayConfig) *DelayEstimator {
 	}
 }
 
+// Update ingests one render and one capture block, updates cross-correlations, and
+// returns the estimated delay in blocks. both slices must be at least BlockSize FloatS16 samples.
 func (de *DelayEstimator) Update(renderBlock, captureBlock []float32) int {
 	dsLen := len(renderBlock) / de.downSamplingFactor
 	mask := de.historyMask
@@ -71,10 +77,12 @@ func (de *DelayEstimator) Update(renderBlock, captureBlock []float32) int {
 	return de.estimatedDelay
 }
 
+// EstimatedDelay returns the most recently computed delay estimate in blocks.
 func (de *DelayEstimator) EstimatedDelay() int {
 	return de.estimatedDelay
 }
 
+// Reset clears all history buffers and correlation state.
 func (de *DelayEstimator) Reset() {
 	clear(de.correlations)
 	clear(de.renderHistory)

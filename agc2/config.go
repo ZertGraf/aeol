@@ -24,12 +24,18 @@ const (
 	minLevelDb = -90.0
 )
 
+// Config is the top-level AGC2 configuration. set Enabled to false to bypass the entire stage.
 type Config struct {
 	Enabled         bool
 	AdaptiveDigital AdaptiveDigitalConfig
 	FixedDigital    FixedDigitalConfig
 }
 
+// AdaptiveDigitalConfig controls the speech-level-tracking adaptive gain stage.
+// DryRun runs all estimators without modifying samples, useful for tuning.
+// HeadroomDb is subtracted from the computed target gain before application.
+// MaxGainChangeDbPerSecond limits how fast the gain ramps up or down.
+// MaxOutputNoiseLevelDbfs prevents boosting noise above this dBFS ceiling.
 type AdaptiveDigitalConfig struct {
 	Enabled                  bool
 	DryRun                   bool
@@ -40,10 +46,14 @@ type AdaptiveDigitalConfig struct {
 	MaxOutputNoiseLevelDbfs  float32
 }
 
+// FixedDigitalConfig applies a constant linear gain derived from GainDb.
+// GainDb of 0 means unity gain (no change).
 type FixedDigitalConfig struct {
 	GainDb float32
 }
 
+// DefaultConfig returns a recommended configuration targeting -18 dBFS speech level,
+// with 30 dB max gain, 3 dB/s ramp rate, and -50 dBFS noise ceiling.
 func DefaultConfig() Config {
 	return Config{
 		Enabled: true,

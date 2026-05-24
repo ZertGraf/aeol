@@ -11,6 +11,10 @@ const (
 	filterConvergenceBlocks = 250
 )
 
+// EchoCanceller3 is the main AEC3 engine.
+// it processes 64-sample FloatS16 blocks, maintaining a dual adaptive filter
+// (refined + coarse), a delay estimator, and a frequency-domain suppressor.
+// call ProcessRender before ProcessCapture on every time step.
 type EchoCanceller3 struct {
 	config     EchoCanceller3Config
 	sampleRate uint32
@@ -47,6 +51,9 @@ type EchoCanceller3 struct {
 	scratchY2        [FFTSizeBy2Plus1]float32
 }
 
+// NewEchoCanceller3 creates a new AEC3 engine.
+// sampleRate determines the number of frequency bands (1 for <=16 kHz, 2 for <=32 kHz, 3 for 48 kHz).
+// numChannels must be 1 (mono only); fftFactory is optional and selects the FFT backend.
 func NewEchoCanceller3(config EchoCanceller3Config, sampleRate uint32, numChannels int, fftFactory ...fft.Factory) *EchoCanceller3 {
 	factory := fft.DefaultFactory
 	if len(fftFactory) > 0 && fftFactory[0] != nil {
@@ -71,6 +78,9 @@ func NewEchoCanceller3(config EchoCanceller3Config, sampleRate uint32, numChanne
 	return ec
 }
 
+// ProcessRender feeds one far-end (speaker/render) block into the echo canceller.
+// renderFrame must contain at least BlockSize (64) FloatS16 samples.
+// must be called once before each corresponding ProcessCapture call.
 func (ec *EchoCanceller3) ProcessRender(renderFrame []float32) {
 	if len(renderFrame) < BlockSize {
 		return
@@ -84,6 +94,9 @@ func (ec *EchoCanceller3) ProcessRender(renderFrame []float32) {
 	copy(ec.renderBlock.View(0, 0), renderFrame[:BlockSize])
 }
 
+// ProcessCapture removes echo from a near-end (microphone) block.
+// captureFrame is modified in-place and must contain at least BlockSize (64) FloatS16 samples.
+// ProcessRender must have been called for the corresponding time step before this call.
 func (ec *EchoCanceller3) ProcessCapture(captureFrame []float32) {
 	if len(captureFrame) < BlockSize {
 		return
@@ -232,14 +245,20 @@ func (ec *EchoCanceller3) updateErle(yFft, eFft *FftData) {
 	}
 }
 
+// ERLE returns the current echo return loss enhancement estimate in linear scale.
+// values above 1.0 indicate that echo is being reduced; higher means more cancellation.
 func (ec *EchoCanceller3) ERLE() float32 {
 	return ec.erle
 }
 
+// Delay returns the estimated echo-path delay in blocks.
+// multiply by BlockSize (64) to convert to samples.
 func (ec *EchoCanceller3) Delay() int {
 	return ec.delay
 }
 
+// Reset clears all internal state of the echo canceller.
+// after a reset the engine behaves as if newly created with the same config.
 func (ec *EchoCanceller3) Reset() {
 	ec.subtractor.Reset()
 	ec.suppressor.Reset()

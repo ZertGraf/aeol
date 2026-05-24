@@ -2,6 +2,8 @@ package agc2
 
 import "math"
 
+// VoiceActivityDetector estimates speech probability per frame using RMS-based
+// thresholding with a hangover to avoid premature drop-off at the end of speech.
 type VoiceActivityDetector struct {
 	speechProbability float32
 	rmsThresholdDbfs  float32
@@ -9,6 +11,7 @@ type VoiceActivityDetector struct {
 	hangoverCounter   int
 }
 
+// NewVoiceActivityDetector creates a VAD with a -50 dBFS RMS threshold and 5-frame hangover.
 func NewVoiceActivityDetector() *VoiceActivityDetector {
 	return &VoiceActivityDetector{
 		rmsThresholdDbfs: -50.0,
@@ -16,6 +19,8 @@ func NewVoiceActivityDetector() *VoiceActivityDetector {
 	}
 }
 
+// Analyze estimates the speech probability for the given frame and returns a value in [0, 1].
+// samples must be in FloatS16 format. updates internal hangover state.
 func (vad *VoiceActivityDetector) Analyze(samples []float32) float32 {
 	rms := computeRms(samples)
 	rmsDbfs := linearToDb(rms)
@@ -36,10 +41,12 @@ func (vad *VoiceActivityDetector) Analyze(samples []float32) float32 {
 	return vad.speechProbability
 }
 
+// SpeechProbability returns the speech probability computed in the last Analyze call.
 func (vad *VoiceActivityDetector) SpeechProbability() float32 {
 	return vad.speechProbability
 }
 
+// Reset clears speech probability and hangover counter.
 func (vad *VoiceActivityDetector) Reset() {
 	vad.speechProbability = 0
 	vad.hangoverCounter = 0

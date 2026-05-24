@@ -17,6 +17,9 @@ const (
 	outputClampMin        = -32768.0
 )
 
+// SubtractorOutput holds the per-block output of the dual adaptive filter step.
+// ERefined/ECoarse are time-domain error signals; ERefinedFft is the spectrum of ERefined.
+// E2Refined/E2Coarse hold per-bin power of the respective error signals.
 type SubtractorOutput struct {
 	SRefined    [BlockSize]float32
 	SCoarse     [BlockSize]float32
@@ -35,6 +38,9 @@ type SubtractorOutput struct {
 	SCoarseMaxAbs  float32
 }
 
+// ComputeMetrics computes energy and peak statistics from the capture signal y and
+// the current ERefined/ECoarse/SRefined/SCoarse arrays stored in the receiver.
+// y must be at least BlockSize (64) FloatS16 samples.
 func (o *SubtractorOutput) ComputeMetrics(y []float32) {
 	var y2, e2r, e2c, s2r, s2c float32
 	var srMax, scMax float32
@@ -120,6 +126,9 @@ func (m *filterMisadjustmentEstimator) reset() {
 	m.overhang = 0
 }
 
+// Subtractor runs both the refined and coarse NLMS adaptive filters each block.
+// the refined filter tracks the echo path precisely; the coarse filter provides
+// a stable fallback when the refined filter diverges or misadjusts.
 type Subtractor struct {
 	refinedFilter *AdaptiveFilter
 	coarseFilter  *AdaptiveFilter
@@ -135,6 +144,8 @@ type Subtractor struct {
 	scratchECoarseFft FftData
 }
 
+// NewSubtractor creates a Subtractor using the given filter config.
+// fftFactory is optional; if omitted the default Ooura FFT backend is used.
 func NewSubtractor(config FilterConfig, fftFactory ...fft.Factory) *Subtractor {
 	factory := fft.DefaultFactory
 	if len(fftFactory) > 0 && fftFactory[0] != nil {
@@ -234,6 +245,7 @@ func (sub *Subtractor) Process(renderBuffer *RenderBuffer, captureFft *FftData, 
 	}
 }
 
+// Reset clears both adaptive filters and all estimation state.
 func (sub *Subtractor) Reset() {
 	sub.refinedFilter.Reset()
 	sub.coarseFilter.Reset()

@@ -24,19 +24,28 @@ const (
 	blockSize10ms = 160
 )
 
+// SuppressionLevel controls the aggressiveness of noise suppression.
+// higher levels reduce more noise but may introduce more speech distortion.
 type SuppressionLevel int
 
 const (
-	SuppressionLow      SuppressionLevel = 0
+	// SuppressionLow applies minimal noise reduction with the least speech distortion.
+	SuppressionLow SuppressionLevel = 0
+	// SuppressionModerate applies balanced noise reduction; the recommended default.
 	SuppressionModerate SuppressionLevel = 1
-	SuppressionHigh     SuppressionLevel = 2
+	// SuppressionHigh applies aggressive noise reduction with noticeable over-subtraction.
+	SuppressionHigh SuppressionLevel = 2
+	// SuppressionVeryHigh applies maximum noise reduction; may cause musical noise artifacts.
 	SuppressionVeryHigh SuppressionLevel = 3
 )
 
+// Config holds configuration for the noise suppressor.
 type Config struct {
+	// Level sets the suppression aggressiveness.
 	Level SuppressionLevel
 }
 
+// DefaultConfig returns a Config with SuppressionModerate level.
 func DefaultConfig() Config {
 	return Config{Level: SuppressionModerate}
 }

@@ -6,6 +6,9 @@ import (
 	"sonora/fft"
 )
 
+// Suppressor performs spectral subtraction noise suppression using overlap-add FFT processing.
+// it operates on 160-sample FloatS16 frames (10ms at 16kHz) with a 256-point FFT and 96-sample overlap.
+// instances are not safe for concurrent use.
 type Suppressor struct {
 	config         Config
 	params         suppressionParams
@@ -31,6 +34,8 @@ type Suppressor struct {
 	signalSpec  [numFreqBins]float32
 }
 
+// NewSuppressor creates a new noise suppressor with the given config.
+// cfg sets suppression aggressiveness; fftFactory is optional and selects the FFT backend (default: pure Go Ooura).
 func NewSuppressor(cfg Config, fftFactory ...fft.Factory) *Suppressor {
 	factory := fft.DefaultFactory
 	if len(fftFactory) > 0 && fftFactory[0] != nil {
@@ -61,6 +66,9 @@ func (s *Suppressor) initWindow() {
 	}
 }
 
+// Process performs one frame of noise suppression in-place.
+// frame must contain exactly 160 FloatS16 samples (float32 in [-32768, 32767]).
+// applies analysis windowing, forward FFT, Wiener filtering, inverse FFT, and overlap-add synthesis.
 func (s *Suppressor) Process(frame []float32) {
 	if len(frame) < frameLength {
 		return
@@ -119,6 +127,8 @@ func (s *Suppressor) Process(frame []float32) {
 	copy(s.synthOverlap[:], s.synthBuffer[frameLength:fftSize])
 }
 
+// Reset clears all internal state including overlap buffers, noise estimator, and synthesis state.
+// call this when reusing a Suppressor for a new audio stream.
 func (s *Suppressor) Reset() {
 	clear(s.overlapBuf[:])
 	clear(s.synthOverlap[:])
@@ -128,6 +138,10 @@ func (s *Suppressor) Reset() {
 	clear(s.upperBandDelayBuf[1][:])
 }
 
+// ProcessUpperBand applies gain-matched suppression to an upper frequency band.
+// band is 0-based and indexes the upper bands above 8kHz (e.g. 0 = first upper band at 8-16kHz for 32kHz input).
+// must be called after Process for the same frame; derives gain from the lower band Wiener filter state and speech probability.
+// frame must contain exactly 160 FloatS16 samples and is modified in-place with a latency-compensating delay.
 func (s *Suppressor) ProcessUpperBand(frame []float32, band int) {
 	if len(frame) < frameLength {
 		return
