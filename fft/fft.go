@@ -1,3 +1,6 @@
+// Package fft defines the FFT interface and provides a pure Go backend (Ooura).
+// Processing stages accept an fft.Factory to allow backend selection at construction time.
+// The default backend requires no CGO; for SIMD acceleration see fft/pffft.
 package fft
 
 import "math"
