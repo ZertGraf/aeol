@@ -24,7 +24,7 @@ fft/               — FFT interface + pure Go Ooura backend
 fft/pffft/         — PFFFT CGO backend (optional, requires C compiler)
 rnnoise/           — RNNoise CGO wrapper (optional, requires C compiler)
 third_party/       — vendored C sources (rnnoise)
-simd/              — runtime-selectable SIMD backends (Scalar, SSE2, AVX2, NEON)
+simd/              — runtime-selectable SIMD backends (Scalar, Unrolled, NEON)
 capi/              — C shared library exports (buildmode=c-shared)
 cmd/process_wav/   — batch WAV processing utility
 cmd/measure_rms/   — RMS measurement utility
@@ -46,7 +46,7 @@ go vet ./...
 - NS and AEC3 operate at 16 kHz internally; for 32/48 kHz use `bands.Splitter` to split/merge
 - AEC3 processes 64-sample sub-blocks internally (FrameBlocker), but the API accepts 160-sample frames
 - FFT packed format: [re[0], re[N/2], re[1], im[1], re[2], im[2], ...] — DC and Nyquist in first two slots
-- `fft.Factory` is passed as variadic option to NS/AEC3 constructors; omit for default pure Go backend
+- `fft.Factory` is passed as variadic option to NS/AEC3/RNN VAD constructors; omit for default pure Go backend
 - no stage is safe for concurrent use; AudioProcessing wrapper has a mutex, standalone stages do not
 - RNN VAD operates at 24 kHz; the RNNVADWrapper in agc2 handles resampling from other rates
 - rnnoise/ requires CGO and vendored C sources in third_party/rnnoise/

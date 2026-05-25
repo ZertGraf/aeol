@@ -1,14 +1,10 @@
 package aeol
 
-import (
-	"errors"
-	"fmt"
-)
+import "fmt"
 
 // Supported sample rate constants. AEC3 and NS always operate at 16 kHz internally;
 // higher rates are downsampled to the lowest sub-band via the splitting filter.
 const (
-	SampleRate8kHz  = 8000
 	SampleRate16kHz = 16000
 	SampleRate32kHz = 32000
 	SampleRate48kHz = 48000
@@ -16,7 +12,7 @@ const (
 	// MaxSampleRate is the upper bound accepted by NewStreamConfig and Validate.
 	MaxSampleRate = 384000
 	// MinSampleRate is the lower bound accepted by NewStreamConfig and Validate.
-	MinSampleRate = SampleRate8kHz
+	MinSampleRate = SampleRate16kHz
 
 	// MaxChannels is the maximum number of channels per stream.
 	MaxChannels = 8
@@ -68,8 +64,6 @@ func (sc StreamConfig) Validate() error {
 	return nil
 }
 
-// ErrInvalidStreamConfig is returned when a StreamConfig fails validation.
-var ErrInvalidStreamConfig = errors.New("invalid stream config")
 
 // ToFloatS16 converts normalized [-1, 1] samples to FloatS16 [-32768, 32767] in place.
 func ToFloatS16(samples []float32) {

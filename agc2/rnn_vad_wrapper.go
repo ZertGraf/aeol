@@ -3,6 +3,7 @@ package agc2
 import (
 	"aeol/agc2/rnn_vad"
 	"aeol/dsp"
+	"aeol/fft"
 )
 
 // Ensure RNNVADWrapper implements VADAnalyzer interface.
@@ -28,9 +29,10 @@ type MonoVadImpl struct {
 }
 
 // NewMonoVadImpl creates a new instance of MonoVadImpl.
-func NewMonoVadImpl() *MonoVadImpl {
+// fftFactory is optional and selects the FFT backend for spectral feature extraction.
+func NewMonoVadImpl(fftFactory ...fft.Factory) *MonoVadImpl {
 	return &MonoVadImpl{
-		featuresExtractor: rnn_vad.NewFeaturesExtractor(),
+		featuresExtractor: rnn_vad.NewFeaturesExtractor(fftFactory...),
 		rnnVad:            rnn_vad.NewRNNVad(),
 	}
 }
@@ -68,13 +70,15 @@ type RNNVADWrapper struct {
 }
 
 // NewRNNVADWrapper creates a new RNNVADWrapper with the default reset period.
-func NewRNNVADWrapper(sampleRateHz int) *RNNVADWrapper {
-	return NewRNNVADWrapperWithPeriod(kVadResetPeriodMs, sampleRateHz)
+// fftFactory is optional and selects the FFT backend for spectral feature extraction.
+func NewRNNVADWrapper(sampleRateHz int, fftFactory ...fft.Factory) *RNNVADWrapper {
+	return NewRNNVADWrapperWithPeriod(kVadResetPeriodMs, sampleRateHz, fftFactory...)
 }
 
 // NewRNNVADWrapperWithPeriod creates a new RNNVADWrapper with a specified reset period.
-func NewRNNVADWrapperWithPeriod(vadResetPeriodMs int, sampleRateHz int) *RNNVADWrapper {
-	return NewRNNVADWrapperWithCustomVad(vadResetPeriodMs, NewMonoVadImpl(), sampleRateHz)
+// fftFactory is optional and selects the FFT backend for spectral feature extraction.
+func NewRNNVADWrapperWithPeriod(vadResetPeriodMs int, sampleRateHz int, fftFactory ...fft.Factory) *RNNVADWrapper {
+	return NewRNNVADWrapperWithCustomVad(vadResetPeriodMs, NewMonoVadImpl(fftFactory...), sampleRateHz)
 }
 
 // NewRNNVADWrapperWithCustomVad creates a new RNNVADWrapper with a custom MonoVad implementation.

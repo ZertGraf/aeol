@@ -14,6 +14,7 @@ type AdaptiveDigitalGainController struct {
 	vad               VADAnalyzer
 	limiterInst       *limiter
 	currentGainDb     float32
+	lastSpeechProb    float32
 }
 
 // NewAdaptiveDigitalGainController creates the adaptive gain stage with the given config.
@@ -41,6 +42,7 @@ func NewAdaptiveDigitalGainController(config AdaptiveDigitalConfig, vad ...VADAn
 // a ramped gain and hard limiter. no-op when DryRun is set.
 func (c *AdaptiveDigitalGainController) Process(samples []float32) {
 	speechProb := c.vad.Analyze(samples)
+	c.lastSpeechProb = speechProb
 	rms := computeRms(samples)
 	rmsDbfs := linearToDb(rms)
 
@@ -97,6 +99,11 @@ func (c *AdaptiveDigitalGainController) GainDb() float32 {
 	return c.currentGainDb
 }
 
+// SpeechProbability returns the VAD speech probability from the last Process call.
+func (c *AdaptiveDigitalGainController) SpeechProbability() float32 {
+	return c.lastSpeechProb
+}
+
 // Reset returns the controller to its initial state, discarding all learned speech and noise levels.
 func (c *AdaptiveDigitalGainController) Reset() {
 	c.currentGainDb = c.config.InitialGainDb
@@ -143,6 +150,15 @@ func (gc *GainController2) Process(samples []float32) {
 	if gc.adaptive != nil {
 		gc.adaptive.Process(samples)
 	}
+}
+
+// SpeechProbability returns the VAD speech probability from the last Process call.
+// returns 0 if the adaptive stage is not enabled.
+func (gc *GainController2) SpeechProbability() float32 {
+	if gc.adaptive != nil {
+		return gc.adaptive.SpeechProbability()
+	}
+	return 0
 }
 
 // Reset clears all adaptive state. fixed gain is unaffected.

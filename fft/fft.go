@@ -18,9 +18,13 @@ type FFT interface {
 // to let the caller choose the FFT backend.
 type Factory func(size int) FFT
 
-// DefaultFactory creates a pure Go Ooura FFT. Zero CGO dependencies.
+// DefaultFactory creates a pure Go FFT. Uses radix-2 Ooura for power-of-2 sizes,
+// Bluestein (chirp-z) for arbitrary sizes. Zero CGO dependencies.
 func DefaultFactory(size int) FFT {
-	return NewOoura(size)
+	if size >= 4 && size&(size-1) == 0 {
+		return NewOoura(size)
+	}
+	return NewBluestein(size)
 }
 
 // ForwardSplit runs Forward then unpacks to separate re/im arrays.

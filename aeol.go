@@ -30,10 +30,10 @@ type AudioProcessing struct {
 	captureBuffer *AudioBuffer
 	renderBuffer  *AudioBuffer
 
-	streamDelayMs int
-	stats         AudioProcessingStats
+	stats AudioProcessingStats
 
 	statsDbfs  float64
+	statsVoice bool
 	statsErle  float64
 	statsDelay int
 }
@@ -267,7 +267,8 @@ func (ap *AudioProcessing) ProcessRenderFloatNormalized(data [][]float32) error 
 }
 
 // processRenderFloatLocked feeds render (far-end) audio to echo cancellers.
-// only the first render channel is used — stereo render is not supported.
+// each capture channel's echo canceller receives the corresponding render channel;
+// if render has fewer channels than capture, the last render channel is reused.
 func (ap *AudioProcessing) processRenderFloatLocked(data [][]float32) error {
 	if len(data) == 0 || len(data[0]) == 0 {
 		return nil
@@ -281,14 +282,18 @@ func (ap *AudioProcessing) processRenderFloatLocked(data [][]float32) error {
 			ap.renderBuffer.SplitIntoFrequencyBands()
 		}
 
-		lowerBand := ap.renderBuffer.SplitChannel(0, 0)
-
-		for start := 0; start+aec3.BlockSize <= len(lowerBand); start += aec3.BlockSize {
-			block := lowerBand[start : start+aec3.BlockSize]
-			for _, ec := range ap.echoCancellers {
-				if ec != nil {
-					ec.ProcessRender(block)
-				}
+		renderChannels := ap.renderBuffer.Channels()
+		for ch, ec := range ap.echoCancellers {
+			if ec == nil {
+				continue
+			}
+			renderCh := ch
+			if renderCh >= renderChannels {
+				renderCh = renderChannels - 1
+			}
+			lowerBand := ap.renderBuffer.SplitChannel(renderCh, 0)
+			for start := 0; start+aec3.BlockSize <= len(lowerBand); start += aec3.BlockSize {
+				ec.ProcessRender(lowerBand[start : start+aec3.BlockSize])
 			}
 		}
 	}
@@ -346,34 +351,35 @@ func (ap *AudioProcessing) ProcessRenderInt16(interleaved []int16) error {
 }
 
 // ApplyConfig replaces the active processing configuration at runtime.
-// stages that are newly enabled are initialized fresh; stages that are disabled are torn down.
-// does not reset the internal state of stages that remain enabled across calls.
+// all enabled stages are (re)created with the new parameters; disabled stages are torn down.
+// this resets internal state of every stage — AEC3 will reconverge, NS will re-estimate
+// noise, AGC2 will re-learn levels. intended for mode changes, not per-frame tuning.
 func (ap *AudioProcessing) ApplyConfig(config Config) error {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
 
 	numChannels := int(ap.captureConfig.NumChannels)
 
-	if config.HighPassFilterEnabled() && len(ap.highPassFilters) == 0 {
+	if config.HighPassFilterEnabled() {
 		ap.highPassFilters = make([]*hpf.Filter, numChannels)
 		for ch := 0; ch < numChannels; ch++ {
 			ap.highPassFilters[ch] = hpf.New(ap.captureConfig.SampleRateHz)
 		}
-	} else if !config.HighPassFilterEnabled() {
+	} else {
 		ap.highPassFilters = nil
 	}
 
-	if config.NoiseSuppressionEnabled() && len(ap.noiseSuppressors) == 0 {
+	if config.NoiseSuppressionEnabled() {
 		nsCfg := ns.Config{Level: ns.SuppressionLevel(config.NoiseSuppression.Level)}
 		ap.noiseSuppressors = make([]*ns.Suppressor, numChannels)
 		for ch := 0; ch < numChannels; ch++ {
 			ap.noiseSuppressors[ch] = ns.NewSuppressor(nsCfg)
 		}
-	} else if !config.NoiseSuppressionEnabled() {
+	} else {
 		ap.noiseSuppressors = nil
 	}
 
-	if config.GainController2Enabled() && len(ap.gainControllers) == 0 {
+	if config.GainController2Enabled() {
 		gc2Config := agc.Config{
 			Enabled: true,
 			AdaptiveDigital: agc.AdaptiveDigitalConfig{
@@ -393,11 +399,11 @@ func (ap *AudioProcessing) ApplyConfig(config Config) error {
 		for ch := 0; ch < numChannels; ch++ {
 			ap.gainControllers[ch] = agc.NewGainController2(gc2Config)
 		}
-	} else if !config.GainController2Enabled() {
+	} else {
 		ap.gainControllers = nil
 	}
 
-	if config.EchoCancellerEnabled() && len(ap.echoCancellers) == 0 {
+	if config.EchoCancellerEnabled() {
 		ap.echoCancellers = make([]*aec3.EchoCanceller3, numChannels)
 		for ch := 0; ch < numChannels; ch++ {
 			ap.echoCancellers[ch] = aec3.NewEchoCanceller3(
@@ -406,7 +412,7 @@ func (ap *AudioProcessing) ApplyConfig(config Config) error {
 				1,
 			)
 		}
-	} else if !config.EchoCancellerEnabled() {
+	} else {
 		ap.echoCancellers = nil
 	}
 
@@ -419,21 +425,6 @@ func (ap *AudioProcessing) Config() Config {
 	ap.mu.Lock()
 	defer ap.mu.Unlock()
 	return ap.config
-}
-
-// SetStreamDelayMs informs the echo canceller of the end-to-end render-to-capture delay in milliseconds.
-// values outside [0, 500] are clamped to that range.
-// accurate delay estimation improves echo cancellation quality significantly.
-func (ap *AudioProcessing) SetStreamDelayMs(delayMs int) {
-	ap.mu.Lock()
-	defer ap.mu.Unlock()
-	if delayMs < 0 {
-		delayMs = 0
-	}
-	if delayMs > 500 {
-		delayMs = 500
-	}
-	ap.streamDelayMs = delayMs
 }
 
 // Statistics returns a snapshot of the most recently computed processing metrics.
@@ -468,6 +459,11 @@ func (ap *AudioProcessing) updateStats(data [][]float32) {
 	rms := math.Sqrt(sum / float64(len(samples)))
 	ap.statsDbfs = 20 * math.Log10(rms/32768.0 + 1e-10)
 	ap.stats.OutputRmsDbfs = &ap.statsDbfs
+
+	if len(ap.gainControllers) > 0 && ap.gainControllers[0] != nil {
+		ap.statsVoice = ap.gainControllers[0].SpeechProbability() > 0.5
+		ap.stats.VoiceDetected = &ap.statsVoice
+	}
 
 	if len(ap.echoCancellers) > 0 && ap.echoCancellers[0] != nil {
 		ap.statsErle = float64(ap.echoCancellers[0].ERLE())

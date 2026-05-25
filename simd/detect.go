@@ -6,7 +6,7 @@ func detectBackend() Backend {
 	switch runtime.GOARCH {
 	case "amd64":
 		if hasAVX2() {
-			return &avx2Backend{}
+			return &unrolledBackend{}
 		}
 		return &scalarBackend{}
 	case "arm64":
@@ -21,7 +21,7 @@ func availableBackends() []BackendType {
 	switch runtime.GOARCH {
 	case "amd64":
 		if hasAVX2() {
-			backends = append(backends, AVX2)
+			backends = append(backends, Unrolled)
 		}
 	}
 	return backends

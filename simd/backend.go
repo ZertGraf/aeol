@@ -6,7 +6,7 @@ type BackendType int
 const (
 	Scalar BackendType = iota
 	SSE2
-	AVX2
+	Unrolled
 	NEON
 )
 
@@ -14,8 +14,8 @@ func (b BackendType) String() string {
 	switch b {
 	case SSE2:
 		return "SSE2"
-	case AVX2:
-		return "AVX2"
+	case Unrolled:
+		return "Unrolled"
 	case NEON:
 		return "NEON"
 	default:

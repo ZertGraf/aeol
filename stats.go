@@ -1,13 +1,10 @@
 package aeol
 
+// AudioProcessingStats holds metrics computed during the most recent ProcessCapture call.
+// pointer fields are nil when the corresponding stage is not active.
 type AudioProcessingStats struct {
-	OutputRmsDbfs                   *float64
-	VoiceDetected                   *bool
-	EchoReturnLoss                  *float64
-	EchoReturnLossEnhancement       *float64
-	ResidualEchoLikelihood          *float64
-	DelayMs                         *int
-	DelayMedianMs                   *int
-	DelayStandardDeviationMs        *int
-	DivergentFilterFraction         *float64
+	OutputRmsDbfs             *float64
+	VoiceDetected             *bool
+	EchoReturnLossEnhancement *float64
+	DelayMs                   *int
 }

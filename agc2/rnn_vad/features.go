@@ -2,7 +2,9 @@ package rnn_vad
 
 import (
 	"math"
+
 	"aeol/dsp"
+	"aeol/fft"
 )
 
 const kOpusBands24kHz = 20
@@ -216,7 +218,7 @@ func updateCepstralDifferenceStats(newCepstralCoeffs []float32, ringBuf *ringBuf
 
 type SpectralFeaturesExtractor struct {
 	halfWindow                [frameSize20ms24kHz / 2]float32
-	fft480                    *fft480
+	fft480                    fft.FFT
 	referenceFrameFft         [frameSize20ms24kHz]float32
 	laggedFrameFft            [frameSize20ms24kHz]float32
 	spectralCorrelator        *SpectralCorrelator
@@ -228,19 +230,16 @@ type SpectralFeaturesExtractor struct {
 	cepstralDiffsBuf          symmetricMatrixBuffer
 }
 
-func NewSpectralFeaturesExtractor() *SpectralFeaturesExtractor {
+func NewSpectralFeaturesExtractor(fftFactory ...fft.Factory) *SpectralFeaturesExtractor {
+	factory := fft.DefaultFactory
+	if len(fftFactory) > 0 && fftFactory[0] != nil {
+		factory = fftFactory[0]
+	}
 	return &SpectralFeaturesExtractor{
 		halfWindow:         computeScaledHalfVorbisWindow(1.0 / frameSize20ms24kHz),
-		fft480:             newFFT480(),
+		fft480:             factory(frameSize20ms24kHz),
 		spectralCorrelator: &SpectralCorrelator{},
 		dctTable:           computeDctTable(),
-	}
-}
-
-func (s *SpectralFeaturesExtractor) Close() {
-	if s.fft480 != nil {
-		s.fft480.Close()
-		s.fft480 = nil
 	}
 }
 
@@ -255,7 +254,7 @@ func (s *SpectralFeaturesExtractor) computeWindowedForwardFft(frame []float32, f
 		fftOutput[i] = frame[i] * s.halfWindow[i]
 		fftOutput[j] = frame[j] * s.halfWindow[i]
 	}
-	s.fft480.Forward(fftOutput)
+	s.fft480.Forward(fftOutput[:frameSize20ms24kHz])
 	fftOutput[1] = 0.0
 }
 
@@ -353,7 +352,7 @@ type FeaturesExtractor struct {
 	pitchPeriod48kHz          int
 }
 
-func NewFeaturesExtractor() *FeaturesExtractor {
+func NewFeaturesExtractor(fftFactory ...fft.Factory) *FeaturesExtractor {
 	return &FeaturesExtractor{
 		useHighPassFilter: false,
 		hpf: dsp.NewBiQuadFilter(dsp.BiQuadCoefficients{
@@ -361,13 +360,7 @@ func NewFeaturesExtractor() *FeaturesExtractor {
 			A: [2]float32{-1.98889291, 0.98895425},
 		}),
 		pitchEstimator:            newPitchEstimator(),
-		spectralFeaturesExtractor: NewSpectralFeaturesExtractor(),
-	}
-}
-
-func (f *FeaturesExtractor) Close() {
-	if f.spectralFeaturesExtractor != nil {
-		f.spectralFeaturesExtractor.Close()
+		spectralFeaturesExtractor: NewSpectralFeaturesExtractor(fftFactory...),
 	}
 }
 
