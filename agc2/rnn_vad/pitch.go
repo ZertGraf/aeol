@@ -1,6 +1,10 @@
 package rnn_vad
 
-import "aeol/fft"
+import (
+	"math"
+
+	"aeol/fft"
+)
 
 const fftSize512 = 512
 
@@ -325,16 +329,5 @@ func sqrtF32(x float32) float32 {
 	if x <= 0 {
 		return 0
 	}
-	// Newton-Raphson single iteration starting from a float64 sqrt
-	// is precise enough and avoids importing math for a simple helper.
-	r := float32(1.0 / (1 << 15))
-	// use a simple iterative approach via float32 multiplication
-	// sufficient for normalisation purposes
-	var y float32 = x
-	// one Newton step: y = 0.5*(y + x/y)
-	for i := 0; i < 8; i++ {
-		y = 0.5 * (y + x/y)
-	}
-	_ = r
-	return y
+	return float32(math.Sqrt(float64(x)))
 }

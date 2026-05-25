@@ -38,7 +38,7 @@ func computeAndPostProcessLpcCoefficients(x []float32, lpcCoeffs []float32) {
 
 	var autoCorr [order + 1]float32
 	for lag := 0; lag <= order; lag++ {
-		autoCorr[lag] = innerProduct(x[:len(x)-lag], x[lag:])
+		autoCorr[lag] = dotProduct(x[:len(x)-lag], x[lag:])
 	}
 
 	if autoCorr[0] == 0 {
@@ -122,19 +122,6 @@ func computeLpResidual(lpcCoeffs [numLpcCoefficients]float32, x, y []float32) {
 			lpcCoeffs[4]*x[i-5]
 		y[i] = sum
 	}
-}
-
-// innerProduct computes the dot product of two equal-length slices.
-func innerProduct(a, b []float32) float32 {
-	var sum float32
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
-	}
-	for i := 0; i < n; i++ {
-		sum += a[i] * b[i]
-	}
-	return sum
 }
 
 func absF32(x float32) float32 {
