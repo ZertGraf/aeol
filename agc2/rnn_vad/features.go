@@ -115,7 +115,7 @@ func (s *symmetricMatrixBuffer) reset() {
 
 func (s *symmetricMatrixBuffer) push(values []float32) {
 	S := cepstralHistorySize
-	copy(s.buf[:], s.buf[S-1:])
+	copy(s.buf[:], s.buf[S:])
 	for i := 0; i < len(values); i++ {
 		index := (S-1-i)*(S-1) - 1
 		s.buf[index] = values[i]

@@ -141,8 +141,12 @@ func computePitchPeriod12kHz(buf []float32, autoCorr []float32) (int, int) {
 // frameSize20ms24kHz windows over pitchBuffer.
 func (pe *pitchEstimator) computeYEnergy24kHz(pitchBuffer []float32) {
 	yy := dotProduct(pitchBuffer[:frameSize20ms24kHz], pitchBuffer[:frameSize20ms24kHz])
+	if yy < 1 {
+		yy = 1
+	}
+	pe.yEnergy24kHz[0] = yy
 
-	for lag := 0; lag < refineNumLags24kHz; lag++ {
+	for lag := 0; lag+1 < len(pe.yEnergy24kHz); lag++ {
 		old := pitchBuffer[lag]
 		yy -= old * old
 		next := pitchBuffer[lag+frameSize20ms24kHz]
@@ -150,7 +154,7 @@ func (pe *pitchEstimator) computeYEnergy24kHz(pitchBuffer []float32) {
 		if yy < 1 {
 			yy = 1
 		}
-		pe.yEnergy24kHz[lag] = yy
+		pe.yEnergy24kHz[lag+1] = yy
 	}
 }
 
@@ -188,11 +192,11 @@ func (pe *pitchEstimator) computePitchPeriod48kHz(pitchBuffer []float32, best24,
 	// pseudo-interpolation
 	var prev, curr, next float32
 	curr = dotProduct(pitchBuffer[bestLag24:bestLag24+frameSize20ms24kHz], pitchBuffer[:frameSize20ms24kHz])
-	if bestLag24 > 0 {
-		prev = dotProduct(pitchBuffer[bestLag24-1:bestLag24-1+frameSize20ms24kHz], pitchBuffer[:frameSize20ms24kHz])
-	}
 	if bestLag24+1 < refineNumLags24kHz {
-		next = dotProduct(pitchBuffer[bestLag24+1:bestLag24+1+frameSize20ms24kHz], pitchBuffer[:frameSize20ms24kHz])
+		prev = dotProduct(pitchBuffer[bestLag24+1:bestLag24+1+frameSize20ms24kHz], pitchBuffer[:frameSize20ms24kHz])
+	}
+	if bestLag24 > 0 {
+		next = dotProduct(pitchBuffer[bestLag24-1:bestLag24-1+frameSize20ms24kHz], pitchBuffer[:frameSize20ms24kHz])
 	}
 
 	offset := getPitchPseudoInterpolationOffset(prev, curr, next)
@@ -256,15 +260,15 @@ func (pe *pitchEstimator) computeExtendedPitchPeriod48kHz(pitchBuffer []float32,
 			// pseudo-interpolation for sub-harmonic candidate
 			var prev, curr, next float32
 			curr = subAC
-			if subLag24 > 0 {
+			if subLag24+1 < refineNumLags24kHz {
 				prev = dotProduct(
-					pitchBuffer[subLag24-1:subLag24-1+frameSize20ms24kHz],
+					pitchBuffer[subLag24+1:subLag24+1+frameSize20ms24kHz],
 					pitchBuffer[:frameSize20ms24kHz],
 				)
 			}
-			if subLag24+1 < refineNumLags24kHz {
+			if subLag24 > 0 {
 				next = dotProduct(
-					pitchBuffer[subLag24+1:subLag24+1+frameSize20ms24kHz],
+					pitchBuffer[subLag24-1:subLag24-1+frameSize20ms24kHz],
 					pitchBuffer[:frameSize20ms24kHz],
 				)
 			}
@@ -316,10 +320,10 @@ func dotProduct(a, b []float32) float32 {
 // getPitchPseudoInterpolationOffset returns -1, 0, or +1 based on the shape of
 // the auto-correlation around the peak (prev, curr, next).
 func getPitchPseudoInterpolationOffset(prev, curr, next float32) int {
-	if next > prev && next > curr {
+	if (next - prev) > 0.7*(curr-prev) {
 		return 1
 	}
-	if prev > next && prev > curr {
+	if (prev - next) > 0.7*(curr-next) {
 		return -1
 	}
 	return 0

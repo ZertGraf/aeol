@@ -3,10 +3,10 @@ package agc2
 import "math"
 
 type limiterDbGainCurve struct {
-	kneeStartDbfs       float32
-	limiterStartDbfs    float32
-	compressionRatio    float32
-	maxInputLevelDbfs   float32
+	kneeStartDbfs     float32
+	limiterStartDbfs  float32
+	compressionRatio  float32
+	maxInputLevelDbfs float32
 }
 
 func newLimiterDbGainCurve() *limiterDbGainCurve {
@@ -33,86 +33,144 @@ func (c *limiterDbGainCurve) GainDb(inputDbfs float32) float32 {
 		return -(excess * (1.0 - 1.0/c.compressionRatio))
 	}
 
-	return -(inputDbfs - c.limiterStartDbfs) + (c.maxInputLevelDbfs-c.limiterStartDbfs)/c.compressionRatio
+	return -(inputDbfs-c.limiterStartDbfs) + (c.maxInputLevelDbfs-c.limiterStartDbfs)/c.compressionRatio
 }
 
 type limiter struct {
-	curve         *limiterDbGainCurve
-	levelEstimator *fixedDigitalLevelEstimator
+	gainCurve          *interpolatedGainCurve
+	levelEstimator     *fixedDigitalLevelEstimator
+	levelEnvelope      [limiterSubFrames]float32
+	scalingFactors     [limiterSubFrames + 1]float32
+	perSampleScaling   []float32
+	lastScalingFactor  float32
+	samplesPerChannel  int
 }
 
 func newLimiter() *limiter {
 	return &limiter{
-		curve:         newLimiterDbGainCurve(),
-		levelEstimator: newFixedDigitalLevelEstimator(),
+		gainCurve:         newInterpolatedGainCurve(),
+		lastScalingFactor: 1.0,
 	}
 }
 
 func (l *limiter) Process(samples []float32) {
-	level := l.levelEstimator.ComputeLevel(samples)
-	if level < 1e-10 {
+	if len(samples) == 0 {
 		return
 	}
-
-	levelDbfs := linearToDb(level)
-	gainDb := l.curve.GainDb(levelDbfs)
-
-	if gainDb >= 0 {
+	if len(samples)%limiterSubFrames != 0 {
+		clampSamples(samples)
 		return
 	}
+	l.ensureBuffers(len(samples))
 
-	gainLinear := dbToLinear(gainDb)
-	for i := range samples {
-		samples[i] *= gainLinear
-		if samples[i] > 32767.0 {
-			samples[i] = 32767.0
-		} else if samples[i] < -32768.0 {
-			samples[i] = -32768.0
-		}
+	l.levelEstimator.ComputeLevel(samples, l.levelEnvelope[:])
+
+	l.scalingFactors[0] = l.lastScalingFactor
+	for i := 0; i < limiterSubFrames; i++ {
+		l.scalingFactors[i+1] = l.gainCurve.LookUpGainToApply(l.levelEnvelope[i])
+	}
+
+	subFrameLen := len(samples) / limiterSubFrames
+	computePerSampleSubframeFactors(l.scalingFactors[:], l.perSampleScaling, subFrameLen)
+	scaleSamples(l.perSampleScaling, samples)
+
+	l.lastScalingFactor = l.scalingFactors[limiterSubFrames]
+}
+
+func (l *limiter) ensureBuffers(samplesPerChannel int) {
+	if l.levelEstimator == nil {
+		l.levelEstimator = newFixedDigitalLevelEstimator(samplesPerChannel)
+		l.samplesPerChannel = samplesPerChannel
+		l.perSampleScaling = make([]float32, samplesPerChannel)
+		return
+	}
+	if l.samplesPerChannel != samplesPerChannel {
+		l.samplesPerChannel = samplesPerChannel
+		l.levelEstimator.SetSamplesPerChannel(samplesPerChannel)
+		l.perSampleScaling = make([]float32, samplesPerChannel)
 	}
 }
 
 func (l *limiter) Reset() {
-	l.levelEstimator.Reset()
-}
-
-type saturationProtector struct {
-	marginDb       float32
-	peakEnvelop    float32
-	decayRate      float32
-}
-
-func newSaturationProtector() *saturationProtector {
-	return &saturationProtector{
-		marginDb:    2.0,
-		peakEnvelop: 0,
-		decayRate:   0.9993,
+	if l.levelEstimator != nil {
+		l.levelEstimator.Reset()
 	}
 }
 
-func (sp *saturationProtector) HeadroomDb(samples []float32, preGainDb float32) float32 {
-	var peak float32
-	for _, s := range samples {
-		abs := s
-		if abs < 0 {
-			abs = -abs
+func (l *limiter) LastAudioLevelDbfs() float32 {
+	if l.levelEstimator == nil {
+		return minLevelDb
+	}
+	level := l.levelEstimator.LastAudioLevel()
+	if level <= 0 {
+		return minLevelDb
+	}
+	dbfs := linearToDb(level)
+	if dbfs < minLevelDb {
+		return minLevelDb
+	}
+	return dbfs
+}
+
+func interpolateFirstSubframe(lastFactor, currentFactor float32, subframe []float32) {
+	n := float32(len(subframe))
+	if n == 0 {
+		return
+	}
+	for i := range subframe {
+		t := float32(i) / n
+		weight := math.Pow(float64(1.0-t), attackFirstSubframeInterpolationPower)
+		subframe[i] = float32(weight)*(lastFactor-currentFactor) + currentFactor
+	}
+}
+
+func computePerSampleSubframeFactors(scalingFactors []float32, perSample []float32, subFrameLen int) {
+	if subFrameLen <= 0 || len(perSample) == 0 {
+		return
+	}
+	numSubframes := len(scalingFactors) - 1
+	isAttack := scalingFactors[0] > scalingFactors[1]
+	offset := 0
+	start := 0
+	if isAttack {
+		interpolateFirstSubframe(scalingFactors[0], scalingFactors[1], perSample[:subFrameLen])
+		offset = subFrameLen
+		start = 1
+	}
+	for i := start; i < numSubframes; i++ {
+		scalingStart := scalingFactors[i]
+		scalingEnd := scalingFactors[i+1]
+		scalingDiff := (scalingEnd - scalingStart) / float32(subFrameLen)
+		for j := 0; j < subFrameLen; j++ {
+			perSample[offset+j] = scalingStart + scalingDiff*float32(j)
 		}
-		if abs > peak {
-			peak = abs
-		}
+		offset += subFrameLen
 	}
-
-	if peak > sp.peakEnvelop {
-		sp.peakEnvelop = peak
-	} else {
-		sp.peakEnvelop *= sp.decayRate
-	}
-
-	peakDbfs := linearToDb(sp.peakEnvelop)
-	headroom := -(peakDbfs + preGainDb)
-	return float32(math.Max(float64(headroom), 0))
 }
 
-func (sp *saturationProtector) Reset() {
-	sp.peakEnvelop = 0
+func scaleSamples(perSample []float32, samples []float32) {
+	if len(perSample) < len(samples) {
+		return
+	}
+	for i, factor := range perSample[:len(samples)] {
+		v := samples[i] * factor
+		if v > maxFloatS16 {
+			v = maxFloatS16
+		} else if v < minFloatS16 {
+			v = minFloatS16
+		}
+		samples[i] = v
+	}
+}
+
+func clampSamples(samples []float32) {
+	for i := range samples {
+		v := samples[i]
+		if v > maxFloatS16 {
+			v = maxFloatS16
+		} else if v < minFloatS16 {
+			v = minFloatS16
+		}
+		samples[i] = v
+	}
 }

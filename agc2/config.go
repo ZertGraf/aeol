@@ -22,6 +22,7 @@ const (
 	maxGainDb  = 30.0
 	minGainDb  = 0.0
 	minLevelDb = -90.0
+	limiterThresholdForAgcGainDbfs = -1.0
 )
 
 // Config is the top-level AGC2 configuration. set Enabled to false to bypass the entire stage.

@@ -2,8 +2,8 @@ package agc2
 
 import "math"
 
-// AdaptiveDigitalGainController tracks speech and noise levels via exponential estimators
-// and computes a target gain to bring speech toward -18 dBFS. gain changes are
+// AdaptiveDigitalGainController tracks speech/noise levels and headroom and computes
+// a target gain based on the configured headroom and noise limits. gain changes are
 // rate-limited per MaxGainChangeDbPerSecond and a hard limiter clips at FloatS16 bounds.
 type AdaptiveDigitalGainController struct {
 	config            AdaptiveDigitalConfig
@@ -28,7 +28,7 @@ func NewAdaptiveDigitalGainController(config AdaptiveDigitalConfig, vad ...VADAn
 	return &AdaptiveDigitalGainController{
 		config:          config,
 		gainApplier:     newGainApplier(config.InitialGainDb),
-		speechEstimator: newSpeechLevelEstimator(-30),
+		speechEstimator: newSpeechLevelEstimator(config),
 		noiseEstimator:  newNoiseLevelEstimator(),
 		satProtector:    newSaturationProtector(),
 		vad:             v,
@@ -47,9 +47,16 @@ func (c *AdaptiveDigitalGainController) Process(samples []float32) {
 	rmsDbfs := linearToDb(rms)
 
 	c.speechEstimator.Update(rmsDbfs, speechProb)
-	c.noiseEstimator.Update(rmsDbfs, speechProb)
+	speechLevel := c.speechEstimator.LevelDbfs()
 
-	targetGainDb := c.computeTargetGain()
+	peakDbfs := computePeakDbfs(samples)
+	c.satProtector.Analyze(speechProb, peakDbfs, speechLevel)
+
+	c.noiseEstimator.Update(samples)
+
+	targetGainDb := c.computeTargetGain(speechLevel, c.noiseEstimator.LevelDbfs(), c.satProtector.HeadroomDb())
+	limiterEnvelopeDbfs := c.limiterInst.LastAudioLevelDbfs()
+	targetGainDb = limitGainByLowConfidence(targetGainDb, c.currentGainDb, limiterEnvelopeDbfs, c.speechEstimator.IsConfident())
 
 	maxGainChange := c.config.MaxGainChangeDbPerSecond / float32(framesPerSecond)
 	if targetGainDb > c.currentGainDb+maxGainChange {
@@ -67,12 +74,9 @@ func (c *AdaptiveDigitalGainController) Process(samples []float32) {
 	}
 }
 
-func (c *AdaptiveDigitalGainController) computeTargetGain() float32 {
-	speechLevel := c.speechEstimator.LevelDbfs()
-	noiseLevel := c.noiseEstimator.LevelDbfs()
-
-	targetOutputDbfs := float32(-18.0)
-	desiredGain := targetOutputDbfs - speechLevel
+func (c *AdaptiveDigitalGainController) computeTargetGain(speechLevelDbfs float32, noiseLevelDbfs float32, headroomDb float32) float32 {
+	inputLevelDbfs := speechLevelDbfs + headroomDb
+	desiredGain := computeGainDb(inputLevelDbfs, c.config)
 
 	if desiredGain < minGainDb {
 		desiredGain = minGainDb
@@ -81,7 +85,7 @@ func (c *AdaptiveDigitalGainController) computeTargetGain() float32 {
 		desiredGain = c.config.MaxGainDb
 	}
 
-	noiseGainLimit := c.config.MaxOutputNoiseLevelDbfs - noiseLevel
+	noiseGainLimit := c.config.MaxOutputNoiseLevelDbfs - noiseLevelDbfs
 	if noiseGainLimit < 0 {
 		noiseGainLimit = 0
 	}
@@ -89,9 +93,50 @@ func (c *AdaptiveDigitalGainController) computeTargetGain() float32 {
 		desiredGain = noiseGainLimit
 	}
 
-	desiredGain -= c.config.HeadroomDb
-
 	return float32(math.Max(float64(desiredGain), float64(minGainDb)))
+}
+
+func limitGainByLowConfidence(targetGainDb float32, lastGainDb float32, limiterEnvelopeDbfs float32, estimateIsConfident bool) float32 {
+	if estimateIsConfident || limiterEnvelopeDbfs <= limiterThresholdForAgcGainDbfs {
+		return targetGainDb
+	}
+
+	limiterLevelBeforeGain := limiterEnvelopeDbfs - lastGainDb
+	newTargetGainDb := limiterThresholdForAgcGainDbfs - limiterLevelBeforeGain
+	if newTargetGainDb < 0 {
+		newTargetGainDb = 0
+	}
+	if newTargetGainDb < targetGainDb {
+		return newTargetGainDb
+	}
+	return targetGainDb
+}
+
+func computeGainDb(inputLevelDbfs float32, config AdaptiveDigitalConfig) float32 {
+	if inputLevelDbfs < -(config.HeadroomDb+config.MaxGainDb) {
+		return config.MaxGainDb
+	}
+	if inputLevelDbfs < -config.HeadroomDb {
+		return -config.HeadroomDb - inputLevelDbfs
+	}
+	return 0
+}
+
+func computePeakDbfs(samples []float32) float32 {
+	var peak float32
+	for _, s := range samples {
+		abs := s
+		if abs < 0 {
+			abs = -abs
+		}
+		if abs > peak {
+			peak = abs
+		}
+	}
+	if peak <= 1.0 {
+		return minLevelDb
+	}
+	return linearToDb(peak)
 }
 
 // GainDb returns the current adaptive gain in dB as of the last Process call.
