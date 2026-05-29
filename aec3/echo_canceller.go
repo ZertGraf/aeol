@@ -2,7 +2,7 @@ package aec3
 
 import (
 	"math"
-	"aeol/fft"
+	"github.com/ZertGraf/aeol/fft"
 )
 
 const (

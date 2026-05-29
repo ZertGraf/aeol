@@ -21,7 +21,7 @@
 // Instances are not safe for concurrent use; synchronization is the caller's responsibility.
 package bands
 
-import "aeol/dsp"
+import "github.com/ZertGraf/aeol/dsp"
 
 // Splitter splits a single-channel audio frame into frequency bands
 // and merges them back. One Splitter per channel.

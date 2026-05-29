@@ -2,7 +2,7 @@
 // The filter operates on FloatS16 data (float32 values in [-32768, 32767]).
 package hpf
 
-import "aeol/dsp"
+import "github.com/ZertGraf/aeol/dsp"
 
 // biquad coefficients keyed by sample rate.
 // derived from WebRTC's high_pass_filter.cc (M145).

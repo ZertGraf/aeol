@@ -1,6 +1,6 @@
 package aec3
 
-import "aeol/simd"
+import "github.com/ZertGraf/aeol/simd"
 
 // AdaptiveFilter is a frequency-domain NLMS filter that models the echo path.
 // coefficients are stored as complex spectra, one FftData per filter block.

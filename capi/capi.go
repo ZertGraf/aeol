@@ -10,11 +10,11 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"aeol/aec3"
-	agc "aeol/agc2"
-	"aeol/bands"
-	"aeol/hpf"
-	"aeol/ns"
+	"github.com/ZertGraf/aeol/aec3"
+	agc "github.com/ZertGraf/aeol/agc2"
+	"github.com/ZertGraf/aeol/bands"
+	"github.com/ZertGraf/aeol/hpf"
+	"github.com/ZertGraf/aeol/ns"
 )
 
 // handle registry — never panics on invalid handles, thread-safe.

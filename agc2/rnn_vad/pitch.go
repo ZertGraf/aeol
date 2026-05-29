@@ -3,7 +3,7 @@ package rnn_vad
 import (
 	"math"
 
-	"aeol/fft"
+	"github.com/ZertGraf/aeol/fft"
 )
 
 const fftSize512 = 512

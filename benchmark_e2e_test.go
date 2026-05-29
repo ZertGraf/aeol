@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"aeol/aec3"
-	agc "aeol/agc2"
-	"aeol/dsp"
-	"aeol/ns"
+	"github.com/ZertGraf/aeol/aec3"
+	agc "github.com/ZertGraf/aeol/agc2"
+	"github.com/ZertGraf/aeol/dsp"
+	"github.com/ZertGraf/aeol/ns"
 )
 
 const (

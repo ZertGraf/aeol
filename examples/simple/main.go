@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"aeol"
+	"github.com/ZertGraf/aeol"
 )
 
 func main() {

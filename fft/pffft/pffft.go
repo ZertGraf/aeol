@@ -24,7 +24,7 @@ import (
 	"runtime"
 	"unsafe"
 
-	"aeol/fft"
+	"github.com/ZertGraf/aeol/fft"
 )
 
 // FFT wraps a PFFFT real-valued transform of size N.

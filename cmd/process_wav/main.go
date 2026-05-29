@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"aeol"
+	"github.com/ZertGraf/aeol"
 )
 
 func main() {

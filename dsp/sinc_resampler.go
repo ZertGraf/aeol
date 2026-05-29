@@ -3,7 +3,7 @@ package dsp
 import (
 	"math"
 
-	"aeol/simd"
+	"github.com/ZertGraf/aeol/simd"
 )
 
 const (

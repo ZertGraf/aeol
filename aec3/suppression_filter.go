@@ -1,7 +1,7 @@
 package aec3
 
 import (
-	"aeol/fft"
+	"github.com/ZertGraf/aeol/fft"
 )
 
 // SuppressionFilter applies frequency-domain Wiener-like gain to the error signal

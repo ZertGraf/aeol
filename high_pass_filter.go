@@ -1,6 +1,6 @@
 package aeol
 
-import "aeol/hpf"
+import "github.com/ZertGraf/aeol/hpf"
 
 // HighPassFilter wraps one hpf.Filter per channel.
 // Kept for use by benchmark tests that operate at the aeol package level.

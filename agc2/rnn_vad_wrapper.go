@@ -1,9 +1,9 @@
 package agc2
 
 import (
-	"aeol/agc2/rnn_vad"
-	"aeol/dsp"
-	"aeol/fft"
+	"github.com/ZertGraf/aeol/agc2/rnn_vad"
+	"github.com/ZertGraf/aeol/dsp"
+	"github.com/ZertGraf/aeol/fft"
 )
 
 // Ensure RNNVADWrapper implements VADAnalyzer interface.

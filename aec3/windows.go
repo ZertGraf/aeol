@@ -1,6 +1,6 @@
 package aec3
 
-import "aeol/fft"
+import "github.com/ZertGraf/aeol/fft"
 
 const (
 	FFTLength    = FFTSize

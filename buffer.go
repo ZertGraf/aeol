@@ -3,7 +3,7 @@ package aeol
 import (
 	"math"
 
-	"aeol/dsp"
+	"github.com/ZertGraf/aeol/dsp"
 )
 
 // AudioBuffer holds one 10 ms frame of audio in de-interleaved, FloatS16 format.

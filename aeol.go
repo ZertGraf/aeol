@@ -5,10 +5,10 @@ import (
 	"math"
 	"sync"
 
-	"aeol/aec3"
-	agc "aeol/agc2"
-	"aeol/hpf"
-	"aeol/ns"
+	"github.com/ZertGraf/aeol/aec3"
+	agc "github.com/ZertGraf/aeol/agc2"
+	"github.com/ZertGraf/aeol/hpf"
+	"github.com/ZertGraf/aeol/ns"
 )
 
 // AudioProcessing is the main entry point for the audio processing pipeline.

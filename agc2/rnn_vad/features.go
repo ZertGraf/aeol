@@ -3,8 +3,8 @@ package rnn_vad
 import (
 	"math"
 
-	"aeol/dsp"
-	"aeol/fft"
+	"github.com/ZertGraf/aeol/dsp"
+	"github.com/ZertGraf/aeol/fft"
 )
 
 const kOpusBands24kHz = 20

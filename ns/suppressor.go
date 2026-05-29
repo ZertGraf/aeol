@@ -3,7 +3,7 @@ package ns
 import (
 	"math"
 
-	"aeol/fft"
+	"github.com/ZertGraf/aeol/fft"
 )
 
 // Suppressor performs spectral subtraction noise suppression using overlap-add FFT processing.
